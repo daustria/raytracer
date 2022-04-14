@@ -59,13 +59,23 @@ protected:
 			const glm::vec2 & v1
 	);
 
+	void initCubeVertices();
+
+	void initMatrices();
+
+	void updateModelMatrix();
+	void updateProjectionMatrix();
+	void updateViewMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up);
+
 	void reset(); // initialize the relevant variables to their starting values
 
 	ShaderProgram m_shader;/* Actual program that we attach the shaders to, and link them */
 
-        GLint P_uni; // Uniform location for Projection matrix.
-        //GLint V_uni; // Uniform location for View matrix.
-        //GLint M_uni; // Uniform location for Model matrix.
+	// No uniform matrices will be on the shader. For instructional purposes we'll do the matrix manipulations ourselves on the CPU
+	// (and explicitly construct the matrices)
+	glm::mat4 P; //projection
+	glm::mat4 W; //model matrix
+	glm::mat4 V; //view
 
 	GLuint m_vao;            // Vertex Array Object
 	GLuint m_vbo_positions;  // Vertex Buffer Object
@@ -75,4 +85,5 @@ protected:
 
 	glm::vec3 m_currentLineColour;
 
+	std::vector<glm::vec3> m_cubeVertices; //this is the data we'll transform to screen coordinates. starts in model coordinates
 };
