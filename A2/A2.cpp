@@ -198,23 +198,13 @@ void A2::updateProjectionMatrix(float r, float t, float n, float f)
 float applyPlaneFunction(const vec4 &v, const vec4 &plane_normal, const vec4 &plane_point)
 {
 	assert(v.w != 0);
-	vec4 modified_plane_point = plane_point;
-
-	return glm::dot(plane_normal, v - modified_plane_point);
+	return glm::dot(plane_normal, v - plane_point);
 }
 
-// clips the line against the plane.
-// returns true if we discard both points, false otherwise
+// clips the line against the plane. modifies a,b so that the line from a to b is 
+// the new line after clipping. returns true if we discard both points, false otherwise
 bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane_point)
 {	
-	if(a.w < 0) { 
-		a = a*(-1.0f);
-	} 
-
-	if (b.w < 0) {
-		b = b*(-1.0f);
-	}
-
 	float f_a = applyPlaneFunction(a, plane_normal, plane_point);
 	float f_b = applyPlaneFunction(b, plane_normal, plane_point);
 
@@ -250,7 +240,7 @@ bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane
 	vec4 intersection = a + t*(b-a);	
 
 	//if A is on the outside, make it the intersection point
-	if (f_a > 0) {
+	if (f_a >= 0) {
 		a = intersection;
 	} else {
 		//otherwise B is on the outside, so make B the intersection point
@@ -269,14 +259,14 @@ void clipLineSymmetricCube(vec4 &a, vec4 &b, bool print_data)
 	}
 #endif
 	bool clipped = false;
-	//clipped |= clipLinePlane(a, b, vec4(-1,0,0,1), vec4(-1,0,0,1)); // left face
-	//clipped |= clipLinePlane(a, b, vec4(1,0,0,1), vec4(1,0,0,1)); //right
+	clipped |= clipLinePlane(a, b, vec4(-1,0,0,1), vec4(-1,0,0,1)); // left face
+	clipped |= clipLinePlane(a, b, vec4(1,0,0,1), vec4(1,0,0,1)); //right
 
-	//clipped |= clipLinePlane(a, b, vec4(0,1,0,1), vec4(0,1,0,1)); // top
-	//clipped |= clipLinePlane(a, b, vec4(0,-1,0,1), vec4(0,-1,0,1)); // bottom
+	clipped |= clipLinePlane(a, b, vec4(0,1,0,1), vec4(0,1,0,1)); // top
+	clipped |= clipLinePlane(a, b, vec4(0,-1,0,1), vec4(0,-1,0,1)); // bottom
 
-	//clipped |= clipLinePlane(a, b, vec4(0,0,1,1), vec4(0,0,1,1)); // near
-	//clipped |= clipLinePlane(a, b, vec4(0,0,-1,1), vec4(0,0,-1,1)); // far
+	clipped |= clipLinePlane(a, b, vec4(0,0,1,1), vec4(0,0,1,1)); // near
+	clipped |= clipLinePlane(a, b, vec4(0,0,-1,1), vec4(0,0,-1,1)); // far
 
 #ifndef NDEBUG
 	if(print_data && clipped) {
@@ -285,7 +275,6 @@ void clipLineSymmetricCube(vec4 &a, vec4 &b, bool print_data)
 #endif
 
 }
-
 
 void A2::initMatrices()
 {
@@ -533,6 +522,13 @@ void A2::appLogic()
 
 		clipLineSymmetricCube(p_proj, q_proj, false);
 
+#ifndef NDEBUG
+		if(firstRun) {
+			printf("A2::%s() | Line after clipping to [-1,1]^3 : [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
+					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w);
+		}
+#endif
+
 		//Divide by the 4th coordinate
 		homogenize4thChart(p_proj);
 		homogenize4thChart(q_proj);
@@ -731,3 +727,60 @@ void homogenize4thChart(vec4 &v)
 	assert(v.w != 0.0f);
 	v = {v.x/v.w, v.y/v.w, v.z/v.w, 1};
 }
+
+//ViewAdjustor-------------------------------------------------------------------------------
+ViewAdjustor::ClampedFloat::ClampedFloat(float value, float increment, float max, float min) : 
+	value(value), increment(increment), maximum(max), minimum(min) 
+{
+
+}
+
+void ViewAdjustor::ClampedFloat::incrementValue(bool positive) 
+{
+	float new_value = value + (positive ? increment : -1*increment);
+
+	if (new_value <= minimum || new_value >= maximum) {
+		return;
+	}
+
+	value = new_value;
+}
+
+void ViewAdjustor::initLeft(float value, float increment, float max, float min) 
+{
+	left_ = ClampedFloat(value, increment, max, min);
+}
+
+void ViewAdjustor::initMiddle(float value, float increment, float max, float min) 
+{
+	middle_ = ClampedFloat(value, increment, max, min);
+}
+
+void ViewAdjustor::initRight(float value, float increment, float max, float min) 
+{
+	right_ = ClampedFloat(value, increment, max, min);
+}
+
+void ViewAdjustor::initAll(float value, float increment, float max, float min)
+{
+	initLeft(value, increment, max, min);	
+	initRight(value, increment, max, min);	
+	initMiddle(value, increment, max, min);	
+}
+
+// Getters 
+float ViewAdjustor::left() const
+{
+	return left_.value;
+}
+
+float ViewAdjustor::right() const
+{
+	return right_.value;
+}
+
+float ViewAdjustor::middle() const
+{
+	return middle_.value;
+}
+

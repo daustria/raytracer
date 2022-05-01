@@ -75,25 +75,14 @@ protected:
 	// left and right planes will be x=r, x=-r
 	// top and bottom planes will be y=t, y=-t
 	// near and far planes will be z=n, z=f where we imagine n,f < 0
-	//
-	// this also updates clipping planes
 	void updateProjectionMatrix(float r, float t, float n, float f);
 
-	void updateCameraMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up);
-
-	//clips the line a--b against the planes in the viewing volume. modifies a,b so that
-	//it represents the shortened line if the line was clipped.
-	void clipLine(glm::vec4 &a, glm::vec4 &b, bool print_data);
-	
-	//same as above except we just clip against the plane specifically defined by N dot (P - Q) = 0
-	//where N is the plane_normal and plane_point is Q.
+	void updateCameraMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up);	
 	
 	void reset(); // initialize the relevant variables to their starting values
 
 	ShaderProgram m_shader;/* Actual program that we attach the shaders to, and link them */
 
-	// No uniform matrices will be on the shader. For instructional purposes we'll do the matrix manipulations ourselves on the CPU
-	// (and explicitly construct the matrices)
 	glm::mat4 m_model; // object space to world space
 	glm::mat4 m_camera; // world space to camera space
 
