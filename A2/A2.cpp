@@ -43,14 +43,11 @@ A2::A2()
 {
 
 	// scale view 
-	m_scaleAdj.left = 0.5f;
-	m_scaleAdj.middle = 0.5f;
-	m_scaleAdj.right = 0.5f;
+	m_scaleAdj.initAll(0.5f, 0.1f, 1.0f, 0.0f);
 
-	m_scaleAdj.leftIncrement = 0.1f; //scaling of cube in x direction
-	m_scaleAdj.middleIncrement = 0.1f; // z direction
-	m_scaleAdj.rightIncrement = 0.1f; // y direction
-
+	
+	// Eye translation view 	
+	m_eyeAdj.initAll(0, 0.1f, 0.5f, -0.5f);
 }
 
 //----------------------------------------------------------------------------------------
@@ -196,14 +193,6 @@ void A2::updateProjectionMatrix(float r, float t, float n, float f)
 	
 	m_proj = m_orth_proj * m_persp;
 
-	//also we update the cutting planes
-	updateViewingVolume(-r, r, t, -t, n, f);
-
-}
-
-void A2::updateViewingVolume(float l, float r, float t, float b, float n, float f)
-{
-	//TODO
 }
 
 float applyPlaneFunction(const vec4 &v, const vec4 &plane_normal, const vec4 &plane_point)
@@ -230,14 +219,13 @@ bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane
 	float f_b = applyPlaneFunction(b, plane_normal, plane_point);
 
 
-	if(signbit(f_a) == signbit(f_b)) {
+	if (signbit(f_a) == signbit(f_b)) {
 
 		// a and b are on the same side of the plane.. so there is no clipping to be done.
 		// TODO: if a,b are not in the viewing volume then i should not draw the line. but how do i know
 		// if they are in the viewing volume in general? for now, i will see it this way: if f(p) < 0,
 		// then f(p) is 'inside' the plane and i will keep the point. otherwise if f(p) > 0 then i discard it.
-		if (f_a > 0) {
-			//discard both a,b so that we dont draw the line since it is outside the viewing volume
+		if (f_a >= 0) {
 			a = vec4(0,0,0,1);
 			b = vec4(0,0,0,1);
 			return true;
@@ -303,12 +291,12 @@ void A2::initMatrices()
 {
 	//translate by 2 units towards the negative z-axis
 
-	m_model[0] = glm::vec4(m_scaleAdj.left, 0, 0, 0);
-	m_model[1] = glm::vec4(0, m_scaleAdj.middle, 0, 0);
-	m_model[2] = glm::vec4(0, 0, m_scaleAdj.right, 0);
-	m_model[3] = glm::vec4(0, 0, -2.0f, 1.0f); // represents a translation of the origin
+	m_model[0] = glm::vec4(m_scaleAdj.left(), 0, 0, 0);
+	m_model[1] = glm::vec4(0, m_scaleAdj.middle(), 0, 0);
+	m_model[2] = glm::vec4(0, 0, m_scaleAdj.right(), 0);
+	m_model[3] = glm::vec4(0, 0, -0.5f, 1.0f); // represents a translation of the origin
 
-	updateCameraMatrix(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	updateCameraMatrix(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	//cosntruct the matrix for an orthographic projection. 
 	//for now let's just use these default values, but i should be using const values 
@@ -332,55 +320,6 @@ void A2::initMatrices()
 #endif
 
 	m_final = m_viewport * m_proj * m_camera * m_model;
-}
-
-glm::vec4 A2::transformVertexProjection(vec3 vertex, bool print_data)
-{
-	// see how one point transforms over the matrix multiplications	
-	vec4 p = glm::vec4{vertex, 1};
-
-#ifndef NDEBUG
-
-	if (print_data) {
-		cout << "==============================================================" << endl;
-		cout << "Initial Point: " << p << endl;
-	}
-
-#endif 
-	p = m_model*p;
-#ifndef NDEBUG
-	if (print_data) cout << "World Coordinates: " << p << endl;
-#endif 
-	p = m_camera*p;
-#ifndef NDEBUG
-	if (print_data) cout << "Camera Coordinates: " << p << endl;
-#endif 
-
-	p = m_proj*p;
-
-#ifndef NDEBUG
-
-	if (print_data) {
-		cout << "Projective Coordinates: " << p << endl;
-	}
-#endif 
-
-#ifndef NDEBUG
-	if(p.w == 0 && print_data) {
-		printf("A2::%s() | WARNING: 4th coordinate is 0\n", __func__);
-	}
-#endif
-
-	//don't divide by the 4th coordinate yet, we need to clip the lines first..
-	
-//	p = m_viewport*p;
-//#ifndef NDEBUG
-//	if (print_data) {
-//		cout << "Viewport Coordinates: " << p << endl;
-//		cout << "==============================================================" << endl;
-//	}
-//#endif 
-	return p;
 }
 
 //----------------------------------------------------------------------------------------
@@ -538,7 +477,6 @@ void A2::appLogic()
 		vec4 p_model = vec4{m_cubeVertices[p_index], 1};
 		vec4 q_model = vec4{m_cubeVertices[q_index], 1};
 
-
 #ifndef NDEBUG
 		if(firstRun) {
 			printf("==============================================================\n");
@@ -555,7 +493,7 @@ void A2::appLogic()
 
 		//Clip the line against the near plane, keep normal pointing outwards
 		// TODO: For now this assumes the near plane is at (0,0,-1,1). but we should 
-		// have variable near planes. Also figure out why this isnt working
+		// have variable near planes. 
 		bool discarded = clipLinePlane(p_cam, q_cam, vec4(0,0,1,1), vec4(0,0,-1,1));
 
 		if(firstRun) {

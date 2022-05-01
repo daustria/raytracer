@@ -8,6 +8,8 @@
 
 #include <vector>
 
+#include "ViewAdj.hpp"
+
 #define SCREEN_WIDTH 768
 #define SCREEN_HEIGHT 768
 
@@ -26,24 +28,6 @@ struct VertexData {
 	GLuint index;
 	GLsizei numVertices;
 };
-
-struct ViewAdjustor {
-
-	float left;
-	float right; 
-	float middle;
-
-	float leftIncrement;
-	float rightIncrement;
-	float middleIncrement;
-
-	ViewAdjustor() : left(0), right(0), middle(0), leftIncrement(0), rightIncrement(0), middleIncrement(0) {
-
-	}
-
-};
-
-
 
 class A2 : public CS488Window {
 public:
@@ -97,8 +81,6 @@ protected:
 
 	void updateCameraMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up);
 
-	void updateViewingVolume(float l, float r, float t, float b, float n, float f);
-
 	//clips the line a--b against the planes in the viewing volume. modifies a,b so that
 	//it represents the shortened line if the line was clipped.
 	void clipLine(glm::vec4 &a, glm::vec4 &b, bool print_data);
@@ -137,6 +119,7 @@ protected:
 	// For implementing the transformations along various coordinate systems..
 	ViewAdjustor m_scaleAdj; 
 	ViewAdjustor m_perspectiveAdj;
+	ViewAdjustor m_eyeAdj;
 	
 };
 
