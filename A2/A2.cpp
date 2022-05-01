@@ -9,7 +9,15 @@ using namespace std;
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/io.hpp>
+#include <glm/ext.hpp>
+
+#include <math.h>
+#include <assert.h>
+
 using namespace glm;
+
+std::vector<glm::vec3> A2::m_cubeVertices;
+std::vector<int> A2::m_cubeLineIndices; 
 
 //----------------------------------------------------------------------------------------
 // Constructor
@@ -26,10 +34,22 @@ VertexData::VertexData()
 // Constructor
 A2::A2()
 	: m_currentLineColour(vec3(0.0f)),
-	P(1.0f),
-	W(1.0f),
-	V(1.0f)
+	m_model(1.0f),
+	m_camera(1.0f),
+	m_orth_proj(1.0f),
+	m_persp(1.0f),
+	m_proj(1.0f),
+	m_viewport(1.0f)
 {
+
+	// scale view 
+	m_scaleAdj.left = 0.5f;
+	m_scaleAdj.middle = 0.5f;
+	m_scaleAdj.right = 0.5f;
+
+	m_scaleAdj.leftIncrement = 0.1f; //scaling of cube in x direction
+	m_scaleAdj.middleIncrement = 0.1f; // z direction
+	m_scaleAdj.rightIncrement = 0.1f; // y direction
 
 }
 
@@ -59,72 +79,309 @@ void A2::init()
 	generateVertexBuffers();
 
 	mapVboDataToVertexAttributeLocation();
+
+	initCubeVertices();
+	initCubeIndices();
+	initMatrices();
 }
 
 //----------------------------------------------------------------------------------------
 void A2::initCubeVertices()
 {
 	m_cubeVertices.reserve(8);
-	m_cubeVertices.push_back({-1.0f,-1.0f,-1.0f});
-	m_cubeVertices.push_back({-1.0f,-1.0f,1.0f});
-	m_cubeVertices.push_back({1.0f,-1.0f,-1.0f});
-	m_cubeVertices.push_back({-1.0f,1.0f,-1.0f});
-	m_cubeVertices.push_back({-1.0f,1.0f,1.0f});
-	m_cubeVertices.push_back({1.0f,-1.0f,1.0f});
-	m_cubeVertices.push_back({1.0f,1.0f,-1.0f});
-	m_cubeVertices.push_back({1.0f,1.0f,1.0f});
+	//z =-1
+	m_cubeVertices.push_back({-1.0f, -1.0f, -1.0f});
+	m_cubeVertices.push_back({1.0f, -1.0f, -1.0f});
+	m_cubeVertices.push_back({1.0f, 1.0f, -1.0f});
+	m_cubeVertices.push_back({-1.0f, 1.0f, -1.0f});
+
+	//z = 1
+	m_cubeVertices.push_back({-1.0f, -1.0f, 1.0f});
+	m_cubeVertices.push_back({1.0f, -1.0f, 1.0f});
+	m_cubeVertices.push_back({1.0f, 1.0f, 1.0f});
+	m_cubeVertices.push_back({-1.0f, 1.0f, 1.0f});
 }
 
 //----------------------------------------------------------------------------------------
-void A2::updateViewMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up)
+void A2::initCubeIndices()
+{
+	m_cubeLineIndices.reserve(24);
+
+	//lines for first face (z=-1)
+	m_cubeLineIndices.push_back(0);
+	m_cubeLineIndices.push_back(1);
+
+	m_cubeLineIndices.push_back(1);
+	m_cubeLineIndices.push_back(2);
+
+	m_cubeLineIndices.push_back(2);
+	m_cubeLineIndices.push_back(3);
+
+	m_cubeLineIndices.push_back(3);
+	m_cubeLineIndices.push_back(0);
+
+	//lines for second face (z=1)
+	m_cubeLineIndices.push_back(4);
+	m_cubeLineIndices.push_back(5);
+
+	m_cubeLineIndices.push_back(5);
+	m_cubeLineIndices.push_back(6);
+
+	m_cubeLineIndices.push_back(6);
+	m_cubeLineIndices.push_back(7);
+
+	m_cubeLineIndices.push_back(7);
+	m_cubeLineIndices.push_back(4);
+
+	//lines joining the two faces
+	m_cubeLineIndices.push_back(0);
+	m_cubeLineIndices.push_back(4);
+
+	m_cubeLineIndices.push_back(1);
+	m_cubeLineIndices.push_back(5);
+
+	m_cubeLineIndices.push_back(2);
+	m_cubeLineIndices.push_back(6);
+
+	m_cubeLineIndices.push_back(3);
+	m_cubeLineIndices.push_back(7);
+
+}
+
+//----------------------------------------------------------------------------------------
+void A2::updateCameraMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up)
 {
 	// we can derive a basis of R^3 consisting of these vectors, call it {u,v,w}
 
-	// TODO: find out the purpose of multiplying by -1 here..		
+	// Open question: what is the point of multiplying by -1?
 	glm::vec3 w = glm::normalize(gaze) * -1.0f;
 	glm::vec3 u = glm::normalize(glm::cross(up, w));
 	glm::vec3 v = glm::cross(u,w);
 
-	// So our basis is u,v,w and the origin is at position e.
-	// The world coordinates is in the standard basis and the origin is at (0,0,0).
-	// We want to compute the matrix that moves from world coordinates to the new camera coordinates.
-	// Because the origin is in a different spot, this procedure will be a bit different.
-	//
-	// First we compute the matrix that moves the origin O to position e
-	mat4 move_origin;
-	move_origin[0] = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-	move_origin[1] = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
-	move_origin[2] = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
-	move_origin[3] = glm::vec4(eye.x, eye.y, eye.z, 1.0f);
+	m_camera[0] = vec4( u.x, u.y, u.z, 0 );
+	m_camera[1] = vec4( v.x, v.y, v.z, 0 );
+	m_camera[2] = vec4( w.x, w.y, w.z, 0 );
+	m_camera[3] = vec4( eye.x, eye.y, eye.z, 1 );
 
-	// notice this moves the origin (which is [0:0:0:1] in homogeneous coordinates) to the homogeneous point
-	// [eye.x : eye.y : eye.z : 1 ] which is just the position of the eye in homogeneous coordinates, or eye in regular coordinates
-	
-	//now that the origin is aligned we can compute, as usual, the change of basis matrix from the standard basis to the new basis {u,v,w}
-	mat4 change_basis;
-	change_basis[0] = glm::vec4(u, 0.0f);
-	change_basis[1] = glm::vec4(v, 0.0f);
-	change_basis[2] = glm::vec4(w, 0.0f);
-	change_basis[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f); //move the 4th coordinate along for the ride
+	// before the matrix, notice that the above is a matrix taking the {u,v,w} basis to the 
+	// {x,y,z}. to see this, consider the result after applying the map to a point P = (u_0, v_0, w_0, 1) in
+	// u,v,w coordinates. howeveer we want the matrix taking the {x,y,z} basis to {u,v,w}, so we take the inverse.
+	m_camera = glm::inverse(m_camera);	
 
-	// now in total, the view matrix which goes from  world coordinates with origin (0,0,0) to the coordinates {u,v,w} with origin eye
-	// is going to be the composition of these two maps.
-	
-	V = change_basis * move_origin; // its important to translate the origin first
-	
 }
+
+void A2::updateProjectionMatrix(float r, float t, float n, float f)
+{
+	//for the view matrix we'll just use an orthographic projection for now
+	//page 160 of shirleys book 'fundamentals of computer graphics'
+
+	m_orth_proj[0] = glm::vec4( (float) 1/r, 0, 0, 0 );
+	m_orth_proj[1] = glm::vec4( 0, (float) 1/t, 0, 0 );
+	m_orth_proj[2] = glm::vec4( 0, 0, (float) 2/(n-f), 0 );
+	m_orth_proj[3] = glm::vec4( 0, 0, (float) (n+f)/f-n, 1.0f );
+
+
+	//keep the perspective matrix to be the identity, for now
+	
+	//perspective matrix from shirleys book
+		
+	m_persp[0] = glm::vec4( n, 0, 0, 0 );
+	m_persp[1] = glm::vec4( 0, n, 0, 0 );
+	m_persp[2] = glm::vec4( 0, 0, n+f, 1.0f );
+	m_persp[3] = glm::vec4( 0, 0, -1.0f *n*f, 0 );
+
+	//the perspective matrix maps the perspective view volume to the orthographic view volume.
+	//the orthographic view volume is mapped to the canonical view volume using the orthographic projection matrix.
+	//so , the perspective projection matrix is just the composition
+	
+	m_proj = m_orth_proj * m_persp;
+
+	//also we update the cutting planes
+	updateViewingVolume(-r, r, t, -t, n, f);
+
+}
+
+void A2::updateViewingVolume(float l, float r, float t, float b, float n, float f)
+{
+	//TODO
+}
+
+float applyPlaneFunction(const vec4 &v, const vec4 &plane_normal, const vec4 &plane_point)
+{
+	assert(v.w != 0);
+	vec4 modified_plane_point = plane_point;
+
+	return glm::dot(plane_normal, v - modified_plane_point);
+}
+
+// clips the line against the plane.
+// returns true if we discard both points, false otherwise
+bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane_point)
+{	
+	if(a.w < 0) { 
+		a = a*(-1.0f);
+	} 
+
+	if (b.w < 0) {
+		b = b*(-1.0f);
+	}
+
+	float f_a = applyPlaneFunction(a, plane_normal, plane_point);
+	float f_b = applyPlaneFunction(b, plane_normal, plane_point);
+
+
+	if(signbit(f_a) == signbit(f_b)) {
+
+		// a and b are on the same side of the plane.. so there is no clipping to be done.
+		// TODO: if a,b are not in the viewing volume then i should not draw the line. but how do i know
+		// if they are in the viewing volume in general? for now, i will see it this way: if f(p) < 0,
+		// then f(p) is 'inside' the plane and i will keep the point. otherwise if f(p) > 0 then i discard it.
+		if (f_a > 0) {
+			//discard both a,b so that we dont draw the line since it is outside the viewing volume
+			a = vec4(0,0,0,1);
+			b = vec4(0,0,0,1);
+			return true;
+		}
+		// they are both inside so there is no clipping to be done
+		return false;
+	}
+
+	// a,b are on different sides of the plane.. so now i need to decide which how to shorten it. 
+	// which is the point that lies outside the plane? again i will decide that if f(a) < 0, i will keep that point.
+	// first, we make sure that 'a' is the point we keep (on the 'inside' of the plane) 
+		
+	//so we want to find when the line AB (defined by equation A + t(B-A) = 0) intersects the plane (N,P-Q) = 0.
+	//we do this by plugging the expression for the first equation into the variable P in the second equation. 
+	//doing so, we get the following formula for t
+	
+	float t = f_a / glm::dot(plane_normal, a-b);
+	
+	//make sure that t is in the interval of [0,1] so that its actually on the line [A,B]
+	//assert(0 <= t && t <= 1);
+	//Now let B to be the intersection point, instead of the point outside the plane
+	vec4 intersection = a + t*(b-a);	
+
+	//if A is on the outside, make it the intersection point
+	if (f_a > 0) {
+		a = intersection;
+	} else {
+		//otherwise B is on the outside, so make B the intersection point
+		b = intersection;
+	}
+
+	return false;
+}
+
+void clipLineSymmetricCube(vec4 &a, vec4 &b, bool print_data)
+{
+
+#ifndef NDEBUG
+	if(print_data) {
+		printf("A2::%s() | before clipping: a {%f,%f,%f} b {%f,%f,%f}\n", __func__, a.x, a.y, a.z, b.x, b.y, b.z);
+	}
+#endif
+	bool clipped = false;
+	//clipped |= clipLinePlane(a, b, vec4(-1,0,0,1), vec4(-1,0,0,1)); // left face
+	//clipped |= clipLinePlane(a, b, vec4(1,0,0,1), vec4(1,0,0,1)); //right
+
+	//clipped |= clipLinePlane(a, b, vec4(0,1,0,1), vec4(0,1,0,1)); // top
+	//clipped |= clipLinePlane(a, b, vec4(0,-1,0,1), vec4(0,-1,0,1)); // bottom
+
+	//clipped |= clipLinePlane(a, b, vec4(0,0,1,1), vec4(0,0,1,1)); // near
+	//clipped |= clipLinePlane(a, b, vec4(0,0,-1,1), vec4(0,0,-1,1)); // far
+
+#ifndef NDEBUG
+	if(print_data && clipped) {
+		printf("A2::%s() | after clipping: a {%f,%f,%f} b {%f,%f,%f}\n", __func__, a.x, a.y, a.z, b.x, b.y, b.z );
+	}
+#endif
+
+}
+
 
 void A2::initMatrices()
 {
-	//for now the model matrix will scale everything by a factor of 0.5
-	W[0] = glm::vec4( 0.5f, 0, 0, 0 );
-	W[1] = glm::vec4( 0, 0.5f, 0, 0 );
-	W[2] = glm::vec4( 0, 0, 0.5f, 0 );
-	W[3] = glm::vec4( 0, 0, 0, 0.5f );
+	//translate by 2 units towards the negative z-axis
 
-	updateViewMatrix(glm::vec3(0.0f,2*M_SQRT1_2, 2*M_SQRT1_2), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	m_model[0] = glm::vec4(m_scaleAdj.left, 0, 0, 0);
+	m_model[1] = glm::vec4(0, m_scaleAdj.middle, 0, 0);
+	m_model[2] = glm::vec4(0, 0, m_scaleAdj.right, 0);
+	m_model[3] = glm::vec4(0, 0, -2.0f, 1.0f); // represents a translation of the origin
+
+	updateCameraMatrix(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+	//cosntruct the matrix for an orthographic projection. 
+	//for now let's just use these default values, but i should be using const values 
+	
+	updateProjectionMatrix(3.0f, 3.0f, -1.0f, -5.0f);
+
+	//Keep the viewport matrix to be the identity for now..
+/*
+	// the viewport matrix is always constant since the screen dimensions and canonical view volume are constant
+	m_viewport[0] = glm::vec4( (float) SCREEN_WIDTH/2, 0, 0, (float) (SCREEN_WIDTH-1)/2 );	
+	m_viewport[2] = glm::vec4( 0, 0, 1, 0 );
+	m_viewport[3] = glm::vec4( 0, 0, 0, 1 );
+*/
+
+#ifndef NDEBUG
+	cout << "MODEL:" << endl << m_model << endl;
+	cout << "CAMERA:" << endl << m_camera << endl;
+	cout << "PROJECTION:" <<  endl << m_proj << endl;
+	cout << "VIEWPORT:" << endl << m_viewport << endl;
+	cout << endl;
+#endif
+
+	m_final = m_viewport * m_proj * m_camera * m_model;
 }
 
+glm::vec4 A2::transformVertexProjection(vec3 vertex, bool print_data)
+{
+	// see how one point transforms over the matrix multiplications	
+	vec4 p = glm::vec4{vertex, 1};
+
+#ifndef NDEBUG
+
+	if (print_data) {
+		cout << "==============================================================" << endl;
+		cout << "Initial Point: " << p << endl;
+	}
+
+#endif 
+	p = m_model*p;
+#ifndef NDEBUG
+	if (print_data) cout << "World Coordinates: " << p << endl;
+#endif 
+	p = m_camera*p;
+#ifndef NDEBUG
+	if (print_data) cout << "Camera Coordinates: " << p << endl;
+#endif 
+
+	p = m_proj*p;
+
+#ifndef NDEBUG
+
+	if (print_data) {
+		cout << "Projective Coordinates: " << p << endl;
+	}
+#endif 
+
+#ifndef NDEBUG
+	if(p.w == 0 && print_data) {
+		printf("A2::%s() | WARNING: 4th coordinate is 0\n", __func__);
+	}
+#endif
+
+	//don't divide by the 4th coordinate yet, we need to clip the lines first..
+	
+//	p = m_viewport*p;
+//#ifndef NDEBUG
+//	if (print_data) {
+//		cout << "Viewport Coordinates: " << p << endl;
+//		cout << "==============================================================" << endl;
+//	}
+//#endif 
+	return p;
+}
 
 //----------------------------------------------------------------------------------------
 void A2::createShaderProgram()
@@ -132,8 +389,7 @@ void A2::createShaderProgram()
 	m_shader.generateProgramObject();
 	m_shader.attachVertexShader( getAssetFilePath("VertexShader.vs").c_str() );
 	m_shader.attachFragmentShader( getAssetFilePath("FragmentShader.fs").c_str() );
-	m_shader.link();
-}
+	m_shader.link(); }
 
 //---------------------------------------------------------------------------------------- Spring 2020
 void A2::enableVertexAttribIndices()
@@ -252,24 +508,107 @@ void A2::drawLine(
  */
 void A2::appLogic()
 {
-	// Place per frame, application logic here ...
 
+	/*
+	 * Game plan: For a line PQ in model coordinates:
+	 *
+	 *  -Move to world coordinates
+	 *  -Clip against the near plane in world coordinates. only the near plane.
+	 *  -Move to projective coordiantes by applying camera and then perspective projection.
+	 *  -Clip to the symmetric cube viewing volume, [-1,1]^3 
+	 *  -Homogenize the point
+	 *  -Move to viewport coordinates by applying the viewport transform (can omit for now since viewport is just identity)
+	 *
+	 */
+	static bool firstRun(true);
+	// Place per frame, application logic here ...
 	// Call at the beginning of frame, before drawing lines:
 	initLineData();
 
-	// Draw outer square:
 	setLineColour(vec3(1.0f, 0.7f, 0.8f));
-	drawLine(vec2(-0.5f, -0.5f), vec2(0.5f, -0.5f));
-	drawLine(vec2(0.5f, -0.5f), vec2(0.5f, 0.5f));
-	drawLine(vec2(0.5f, 0.5f), vec2(-0.5f, 0.5f));
-	drawLine(vec2(-0.5f, 0.5f), vec2(-0.5f, -0.5f));
 
-	// Draw inner square:
-	setLineColour(vec3(0.2f, 1.0f, 1.0f));
-	drawLine(vec2(-0.25f, -0.25f), vec2(0.25f, -0.25f));
-	drawLine(vec2(0.25f, -0.25f), vec2(0.25f, 0.25f));
-	drawLine(vec2(0.25f, 0.25f), vec2(-0.25f, 0.25f));
-	drawLine(vec2(-0.25f, 0.25f), vec2(-0.25f, -0.25f));
+	//draw each line	
+	for(int i = 0; i+1 < m_cubeLineIndices.size(); i += 2)
+	{
+		int p_index = m_cubeLineIndices[i];
+		int q_index = m_cubeLineIndices[i+1];
+
+		//Get the line in model coordinates
+		
+		vec4 p_model = vec4{m_cubeVertices[p_index], 1};
+		vec4 q_model = vec4{m_cubeVertices[q_index], 1};
+
+
+#ifndef NDEBUG
+		if(firstRun) {
+			printf("==============================================================\n");
+			printf("A2::%s() | Line in model space: (%f,%f,%f,%f) -- (%f,%f,%f,%f)\n", __func__, 
+					p_model.x, p_model.y, p_model.z, p_model.w, q_model.x, q_model.y, q_model.z, q_model.w );
+		}
+#endif
+
+		//Move to camera coordinates
+		mat4 model_to_camera = m_camera*m_model;
+		
+		vec4 p_cam = model_to_camera* p_model;
+		vec4 q_cam = model_to_camera * q_model;
+
+		//Clip the line against the near plane, keep normal pointing outwards
+		// TODO: For now this assumes the near plane is at (0,0,-1,1). but we should 
+		// have variable near planes. Also figure out why this isnt working
+		bool discarded = clipLinePlane(p_cam, q_cam, vec4(0,0,1,1), vec4(0,0,-1,1));
+
+		if(firstRun) {
+#ifndef NDEBUG
+			printf("A2::%s() | Line in camera space: (%f,%f,%f,%f) -- (%f,%f,%f,%f)\n", __func__, 
+					p_cam.x, p_cam.y, p_cam.z, p_cam.w, q_cam.x, q_cam.y, q_cam.z, q_cam.w);
+#endif
+		}
+
+
+		if (discarded) {
+#ifndef NDEBUG
+			if(firstRun) {
+				printf("A2::%s() | both points in line are clipped, not drawing this line...\n", __func__);
+			}
+#endif
+			continue;
+		}
+		
+
+
+		// now do the projective transformation, getting it in homogeneous coordinates	
+
+		vec4 p_proj = m_proj*p_cam;
+		vec4 q_proj = m_proj*q_cam;
+
+#ifndef NDEBUG
+		if(firstRun) {
+			printf("A2::%s() | Line in homogeneous coordinates: [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
+					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w );
+		}
+#endif
+
+
+
+		// The projective transformation moves the frustum to the symmetric cube [-1,1]^3. We now clip against this cube.
+
+		clipLineSymmetricCube(p_proj, q_proj, false);
+
+		//Divide by the 4th coordinate
+		homogenize4thChart(p_proj);
+		homogenize4thChart(q_proj);
+
+#ifndef NDEBUG
+		if(firstRun) {
+			printf("A2::%s() | Line after homogenizing: [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
+					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w);
+		}
+#endif
+
+		drawLine({p_proj.x, p_proj.y}, {q_proj.x, q_proj.y});
+	}
+	firstRun = false;
 
 }
 
@@ -291,7 +630,6 @@ void A2::guiLogic()
 
 	ImGui::Begin("Properties", &showDebugWindow, ImVec2(100,100), opacity,
 			windowFlags);
-
 
 		// Add more gui elements here here ...
 
@@ -448,4 +786,10 @@ bool A2::keyInputEvent (
 	// Fill in with event handling code...
 
 	return eventHandled;
+}
+
+void homogenize4thChart(vec4 &v)
+{
+	assert(v.w != 0.0f);
+	v = {v.x/v.w, v.y/v.w, v.z/v.w, 1};
 }
