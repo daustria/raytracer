@@ -41,19 +41,17 @@ A2::A2()
 	m_proj(1.0f),
 	m_viewport(1.0f)
 {
-
-	// scale view 
-	m_scaleAdj.initAll(1.0f, 0.1f, 3.0f, 0.0f);
-
-	// Eye translation view 	
-	m_eyeAdj.initAll(0, 0.1f, 0.5f, -0.5f);
-
-	//Object translation
-	m_translateObjAdj.initX(0, 0.1f, 5.0f, -5.0f);
-	m_translateObjAdj.initY(0, 0.1f, 5.0f, -5.0f);
-	m_translateObjAdj.initZ(-1.0f, -0.1f, 5.0f, -5.0f);
-
-
+	m_keyMap = {
+		{GLFW_KEY_O, 0},
+		{GLFW_KEY_E, 0},
+		{GLFW_KEY_P, 0},
+		{GLFW_KEY_R, 0},
+		{GLFW_KEY_T, 0},
+		{GLFW_KEY_S, 0},
+		{GLFW_MOUSE_BUTTON_LEFT, 0},
+		{GLFW_MOUSE_BUTTON_RIGHT, 0},
+		{GLFW_MOUSE_BUTTON_MIDDLE, 0} 
+	};
 }
 
 //----------------------------------------------------------------------------------------
@@ -86,15 +84,7 @@ void A2::init()
 	initCubeVertices();
 	initCubeIndices();
 	initMatrices();
-
-	m_keyMap = {
-		{GLFW_KEY_O, 0},
-		{GLFW_KEY_E, 0},
-		{GLFW_KEY_P, 0},
-		{GLFW_KEY_R, 0},
-		{GLFW_KEY_T, 0},
-		{GLFW_KEY_S, 0},
-	};
+	initCoordinateSystems();
 }
 
 //----------------------------------------------------------------------------------------
@@ -160,17 +150,33 @@ void A2::initCubeIndices()
 
 }
 
-//----------------------------------------------------------------------------------------
-void A2::updateWorldMatrix(glm::vec3 new_origin, glm::vec3 scale_factor, glm::vec3 rotation_angle)
-{
-	//ignore these fields for now 
-	(void) rotation_angle;
-	(void) new_origin;
 
-	m_model[0] = glm::vec4(m_scaleAdj.x(), 0, 0, 0);
-	m_model[1] = glm::vec4(0, m_scaleAdj.y(), 0, 0);
-	m_model[2] = glm::vec4(0, 0, m_scaleAdj.z(), 0);
-	m_model[3] = glm::vec4(m_translateObjAdj.x(), m_translateObjAdj.y(), m_translateObjAdj.z(), 1.0f); // represents a translation of the origin
+//----------------------------------------------------------------------------------------
+void A2::initCoordinateSystems()
+{
+	float default_scaling = 0.1f;
+	float default_max = 10.0f;
+
+	// scale view 
+	m_scaleAdj.initAll(1.0f, default_scaling, 3.0f, 0.0f);
+
+	// Eye translation view 	
+	m_translateEyeAdj.initAll(0, default_scaling, 0.5f, -0.5f);
+
+	//Object translation
+	m_translateObjAdj.initX(0, default_scaling, 10.0f, -10.0f);
+	m_translateObjAdj.initY(0, default_scaling, 10.0f, -10.0f);
+	m_translateObjAdj.initZ(-1.0f, -1*default_scaling, 5.0f, -10.0f);
+}
+
+//----------------------------------------------------------------------------------------
+void A2::updateWorldMatrix()
+{
+
+	m_model[0] = glm::vec4(m_scaleAdj.x, 0, 0, 0);
+	m_model[1] = glm::vec4(0, m_scaleAdj.y, 0, 0);
+	m_model[2] = glm::vec4(0, 0, m_scaleAdj.z, 0);
+	m_model[3] = glm::vec4(m_translateObjAdj.x, m_translateObjAdj.y, m_translateObjAdj.z, 1.0f); // represents a translation of the origin
 }
 
 //----------------------------------------------------------------------------------------
@@ -227,7 +233,7 @@ void A2::updateProjectionMatrix(float r, float t, float n, float f)
 //----------------------------------------------------------------------------------------
 void A2::initMatrices()
 {
-	updateWorldMatrix(glm::vec3(0,0,-0.5f), glm::vec3(0.5f,0.5f,0.5f), glm::vec3(0,0,0));
+	updateWorldMatrix();
 
 	updateCameraMatrix(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -569,9 +575,7 @@ void A2::appLogic()
 	//Update the matrices now
 	
 
-	//it doesn't actually matter what we put for now, just that we call it
-	//TODO: make the parameters reflect the above statemnet.. no need to pass vectors in
-	updateWorldMatrix(vec3(), vec3(), vec3());
+	updateWorldMatrix();
 	firstRun = false;
 
 }
@@ -597,6 +601,8 @@ void A2::guiLogic()
 
 		// Add more gui elements here here ...
 
+		ImGui::Text( "Scale Model: (%f,%f,%f)", m_scaleAdj.x, m_scaleAdj.y, m_scaleAdj.z);
+		ImGui::Text( "Translate Model: (%f,%f,%f)", m_translateObjAdj.x, m_translateObjAdj.y, m_translateObjAdj.z);
 
 		// Create Button, and check if it was clicked:
 		if( ImGui::Button( "Quit Application" ) ) {
@@ -662,6 +668,33 @@ void A2::cleanup()
 }
 
 //----------------------------------------------------------------------------------------
+void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
+{
+
+	//If the left mouse button is held, adjust the X-axis coordinate systems	
+	if (m_keyMap[GLFW_MOUSE_BUTTON_LEFT]) {
+		if(m_keyMap[GLFW_KEY_E]) {
+			m_translateObjAdj.incrementX(horizontal_mouse_offset, offset_sign);
+		}
+	}
+
+	//If middle mouse button is held, adjust the Y-axis coordinate systems...
+	if (m_keyMap[GLFW_MOUSE_BUTTON_MIDDLE]) {
+		if(m_keyMap[GLFW_KEY_E]) {
+			m_translateObjAdj.incrementY(horizontal_mouse_offset, offset_sign);
+		}
+	}
+
+	//If right mouse button...
+	if (m_keyMap[GLFW_MOUSE_BUTTON_RIGHT]) {
+		if(m_keyMap[GLFW_KEY_E]) {
+			m_translateObjAdj.incrementZ(horizontal_mouse_offset, offset_sign);
+		}
+
+	}
+	
+}
+//----------------------------------------------------------------------------------------
 /*
  * Event handler.  Handles cursor entering the window area events.
  */
@@ -685,6 +718,15 @@ bool A2::mouseMoveEvent (
 ) {
 	bool eventHandled(false);
 
+	double offset = m_oldMouseX - xPos;
+
+	float offset_distance = abs(offset);
+	float offset_sign = signbit(offset);
+	m_oldMouseX = xPos;
+
+	adjustCoordinateAxes(offset_distance, offset_sign);
+	
+
 	// Fill in with event handling code...
 
 	return eventHandled;
@@ -700,6 +742,16 @@ bool A2::mouseButtonInputEvent (
 		int mods
 ) {
 	bool eventHandled(false);
+	if (m_keyMap.count(button) > 0) {
+		
+		if (actions == GLFW_PRESS) {
+			m_keyMap[button] = true;
+		} 
+
+		if (actions == GLFW_RELEASE) {
+			m_keyMap[button] = false;
+		} 
+	}
 
 	// Fill in with event handling code...
 
@@ -747,27 +799,6 @@ bool A2::keyInputEvent (
 ) {
 	bool eventHandled(false);
 
-	//TODO: for now we just implement scaling based on up and down
-	// arrow key presses. replace this eventually so that it is done with mouse	
-
-	if (action == GLFW_PRESS) {
-		if (key == GLFW_KEY_UP) {
-			m_translateObjAdj.incrementZ();
-		} 
-
-		if (key == GLFW_KEY_RIGHT) {
-			m_translateObjAdj.incrementX();
-		}
-
-		if (key == GLFW_KEY_LEFT) {
-			m_translateObjAdj.incrementX(false);
-		}
-
-		if (key == GLFW_KEY_DOWN) {
-			m_translateObjAdj.incrementZ(false);
-		}
-	}
-
 	//Check if the key is in the map first
 	if (m_keyMap.count(key) > 0) {
 		
@@ -798,15 +829,28 @@ ViewAdjustor::ClampedFloat::ClampedFloat(float value, float increment, float max
 
 }
 
-void ViewAdjustor::ClampedFloat::incrementValue(bool positive) 
+void ViewAdjustor::ClampedFloat::incrementValue(float factor, bool positive) 
 {
-	float new_value = value + (positive ? increment : -1*increment);
+	float increment_0 = factor*increment;
 
-	if (new_value <= minimum || new_value >= maximum) {
+	float new_value = value;
+
+	if (positive) {
+		new_value += increment_0;
+	} else {
+		new_value -= increment_0;
+	}
+
+	if (new_value < minimum || new_value > maximum) {
 		return;
 	}
 
 	value = new_value;
+}
+
+ViewAdjustor::ViewAdjustor() : x(x_.value), y(y_.value), z(z_.value)
+{
+
 }
 
 void ViewAdjustor::initX(float value, float increment, float max, float min) 
@@ -831,39 +875,22 @@ void ViewAdjustor::initAll(float value, float increment, float max, float min)
 	initY(value, increment, max, min);	
 }
 
-// Getters 
-float ViewAdjustor::x() const
+void ViewAdjustor::incrementX(float factor, bool positive)
 {
-	return x_.value;
+	x_.incrementValue(factor, positive);
 }
 
-float ViewAdjustor::y() const
+void ViewAdjustor::incrementY(float factor, bool positive)
 {
-	return y_.value;
+	y_.incrementValue(factor, positive);
 }
 
-float ViewAdjustor::z() const
+void ViewAdjustor::incrementZ(float factor, bool positive)
 {
-	return z_.value;
+	z_.incrementValue(factor, positive);
 }
 
-
-void ViewAdjustor::incrementX(bool positive)
-{
-	x_.incrementValue(positive);
-}
-
-void ViewAdjustor::incrementY(bool positive)
-{
-	y_.incrementValue(positive);
-}
-
-void ViewAdjustor::incrementZ(bool positive)
-{
-	z_.incrementValue(positive);
-}
-
-void ViewAdjustor::incrementAll(bool positive)
+void ViewAdjustor::incrementAll(float factor, bool positive)
 {
 	incrementX(positive);
 	incrementZ(positive);

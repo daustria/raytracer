@@ -4,29 +4,29 @@
 class ViewAdjustor {
 
 public:
-	//Default constructor is good enough
+	ViewAdjustor();
 
 	void initX(float value, float increment, float max, float min);
 	void initY(float, float, float, float);
 	void initZ(float, float, float, float);
 	void initAll(float, float, float, float);
 
-	void incrementX(bool positive = true);
-	void incrementY(bool positive = true);
-	void incrementZ(bool positive = true);
-	void incrementAll(bool positive = true);
+	void incrementX(float factor, bool positive = true);
+	void incrementY(float factor, bool positive = true);
+	void incrementZ(float factor, bool positive = true);
+	void incrementAll(float factor, bool positive = true);
 
-	float x() const;
-	float y() const;
-	float z() const;
-
+	//provide read-only access to the fields
+	const float &x; 
+	const float &y;
+	const float &z;
 
 private:
 
 	struct ClampedFloat {
 
 		ClampedFloat(float value = 0, float increment = 0, float max = 0, float min = 0);
-		void incrementValue(bool positive = true); 
+		void incrementValue(float factor, bool positive = true); 
 
 		float value;
 		float increment;
@@ -39,6 +39,5 @@ private:
 	ClampedFloat z_;
 
 };
-
 
 #endif //VIEW_ADJUSTOR_H

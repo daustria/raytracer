@@ -73,12 +73,12 @@ protected:
 	void initMatrices();
 	void updateModelMatrix();
 
+	void initCoordinateSystems();
+
 	glm::vec4 transformVertexProjection(glm::vec3 vertex, bool print_data=false);
 
-	// Updates the world matrix so that the origin of the object is at new_origin,
-	// the scaling along the x_axis is scale_factor.x, similarly for y-axis and z-axis.
-	// also, the rotation along the x_axis is rotation_angle.x, and similar for y-axis and z-axis
-	void updateWorldMatrix(glm::vec3 new_origin, glm::vec3 scale_factor, glm::vec3 rotation_angle);
+	// Updates the world matrix, with the new rotation, translation, and scale factor set by the user 
+	void updateWorldMatrix();
 
 	// orthographic projection
 	// left and right planes will be x=r, x=-r
@@ -89,6 +89,8 @@ protected:
 	void updateCameraMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up);	
 	
 	void reset(); // initialize the relevant variables to their starting values
+
+	void adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign);
 
 	ShaderProgram m_shader;/* Actual program that we attach the shaders to, and link them */
 
@@ -118,10 +120,14 @@ protected:
 	ViewAdjustor m_scaleAdj; //adjust size of object in world space
 	ViewAdjustor m_translateObjAdj; //adjust origin of object in world space
 	ViewAdjustor m_perspectiveAdj;
-	ViewAdjustor m_eyeAdj;
+	ViewAdjustor m_translateEyeAdj;
 
 	// Stores whether a GLFW key is being held
 	std::map<int, bool> m_keyMap;
+
+	//Tracking horizontal movement of the mouse
+	double m_oldMouseX = 0.0f;
+
 	
 };
 
