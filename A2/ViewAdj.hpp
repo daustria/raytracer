@@ -6,14 +6,20 @@ class ViewAdjustor {
 public:
 	//Default constructor is good enough
 
-	void initLeft(float value, float increment, float max, float min);
-	void initMiddle(float, float, float, float);
-	void initRight(float, float, float, float);
+	void initX(float value, float increment, float max, float min);
+	void initY(float, float, float, float);
+	void initZ(float, float, float, float);
 	void initAll(float, float, float, float);
 
-	float left() const;
-	float right() const;
-	float middle() const;
+	void incrementX(bool positive = true);
+	void incrementY(bool positive = true);
+	void incrementZ(bool positive = true);
+	void incrementAll(bool positive = true);
+
+	float x() const;
+	float y() const;
+	float z() const;
+
 
 private:
 
@@ -28,9 +34,9 @@ private:
 		float minimum;
 	};
 
-	ClampedFloat left_;
-	ClampedFloat right_;
-	ClampedFloat middle_;
+	ClampedFloat x_;
+	ClampedFloat y_;
+	ClampedFloat z_;
 
 };
 

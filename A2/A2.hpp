@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 
 #include <vector>
+#include <stdlib.h>
+#include <map>
 
 #include "ViewAdj.hpp"
 
@@ -28,6 +30,8 @@ struct VertexData {
 	GLuint index;
 	GLsizei numVertices;
 };
+
+//Map storing whether keys are held or not
 
 class A2 : public CS488Window {
 public:
@@ -71,6 +75,11 @@ protected:
 
 	glm::vec4 transformVertexProjection(glm::vec3 vertex, bool print_data=false);
 
+	// Updates the world matrix so that the origin of the object is at new_origin,
+	// the scaling along the x_axis is scale_factor.x, similarly for y-axis and z-axis.
+	// also, the rotation along the x_axis is rotation_angle.x, and similar for y-axis and z-axis
+	void updateWorldMatrix(glm::vec3 new_origin, glm::vec3 scale_factor, glm::vec3 rotation_angle);
+
 	// orthographic projection
 	// left and right planes will be x=r, x=-r
 	// top and bottom planes will be y=t, y=-t
@@ -106,9 +115,13 @@ protected:
 	static std::vector<int> m_cubeLineIndices; // holds indices of vertices, describing the order we draw the lines of the cube
 
 	// For implementing the transformations along various coordinate systems..
-	ViewAdjustor m_scaleAdj; 
+	ViewAdjustor m_scaleAdj; //adjust size of object in world space
+	ViewAdjustor m_translateObjAdj; //adjust origin of object in world space
 	ViewAdjustor m_perspectiveAdj;
 	ViewAdjustor m_eyeAdj;
+
+	// Stores whether a GLFW key is being held
+	std::map<int, bool> m_keyMap;
 	
 };
 

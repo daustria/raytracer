@@ -43,11 +43,17 @@ A2::A2()
 {
 
 	// scale view 
-	m_scaleAdj.initAll(0.5f, 0.1f, 1.0f, 0.0f);
+	m_scaleAdj.initAll(1.0f, 0.1f, 3.0f, 0.0f);
 
-	
 	// Eye translation view 	
 	m_eyeAdj.initAll(0, 0.1f, 0.5f, -0.5f);
+
+	//Object translation
+	m_translateObjAdj.initX(0, 0.1f, 5.0f, -5.0f);
+	m_translateObjAdj.initY(0, 0.1f, 5.0f, -5.0f);
+	m_translateObjAdj.initZ(-1.0f, -0.1f, 5.0f, -5.0f);
+
+
 }
 
 //----------------------------------------------------------------------------------------
@@ -80,6 +86,15 @@ void A2::init()
 	initCubeVertices();
 	initCubeIndices();
 	initMatrices();
+
+	m_keyMap = {
+		{GLFW_KEY_O, 0},
+		{GLFW_KEY_E, 0},
+		{GLFW_KEY_P, 0},
+		{GLFW_KEY_R, 0},
+		{GLFW_KEY_T, 0},
+		{GLFW_KEY_S, 0},
+	};
 }
 
 //----------------------------------------------------------------------------------------
@@ -146,6 +161,19 @@ void A2::initCubeIndices()
 }
 
 //----------------------------------------------------------------------------------------
+void A2::updateWorldMatrix(glm::vec3 new_origin, glm::vec3 scale_factor, glm::vec3 rotation_angle)
+{
+	//ignore these fields for now 
+	(void) rotation_angle;
+	(void) new_origin;
+
+	m_model[0] = glm::vec4(m_scaleAdj.x(), 0, 0, 0);
+	m_model[1] = glm::vec4(0, m_scaleAdj.y(), 0, 0);
+	m_model[2] = glm::vec4(0, 0, m_scaleAdj.z(), 0);
+	m_model[3] = glm::vec4(m_translateObjAdj.x(), m_translateObjAdj.y(), m_translateObjAdj.z(), 1.0f); // represents a translation of the origin
+}
+
+//----------------------------------------------------------------------------------------
 void A2::updateCameraMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up)
 {
 	// we can derive a basis of R^3 consisting of these vectors, call it {u,v,w}
@@ -167,6 +195,7 @@ void A2::updateCameraMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up)
 
 }
 
+//----------------------------------------------------------------------------------------
 void A2::updateProjectionMatrix(float r, float t, float n, float f)
 {
 	//for the view matrix we'll just use an orthographic projection for now
@@ -195,6 +224,37 @@ void A2::updateProjectionMatrix(float r, float t, float n, float f)
 
 }
 
+//----------------------------------------------------------------------------------------
+void A2::initMatrices()
+{
+	updateWorldMatrix(glm::vec3(0,0,-0.5f), glm::vec3(0.5f,0.5f,0.5f), glm::vec3(0,0,0));
+
+	updateCameraMatrix(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+	//cosntruct the matrix for an orthographic projection. 
+	//for now let's just use these default values, but i should be using const values 
+	
+	updateProjectionMatrix(3.0f, 3.0f, -1.0f, -5.0f);
+
+	//Keep the viewport matrix to be the identity for now..
+/*
+	// the viewport matrix is always constant since the screen dimensions and canonical view volume are constant
+	m_viewport[0] = glm::vec4( (float) SCREEN_WIDTH/2, 0, 0, (float) (SCREEN_WIDTH-1)/2 );	
+	m_viewport[2] = glm::vec4( 0, 0, 1, 0 );
+	m_viewport[3] = glm::vec4( 0, 0, 0, 1 );
+*/
+
+#ifndef NDEBUG
+	cout << "MODEL:" << endl << m_model << endl;
+	cout << "CAMERA:" << endl << m_camera << endl;
+	cout << "PROJECTION:" <<  endl << m_proj << endl;
+	cout << "VIEWPORT:" << endl << m_viewport << endl;
+	cout << endl;
+#endif
+
+	m_final = m_viewport * m_proj * m_camera * m_model;
+}
+
 float applyPlaneFunction(const vec4 &v, const vec4 &plane_normal, const vec4 &plane_point)
 {
 	assert(v.w != 0);
@@ -208,11 +268,11 @@ bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane
 	float f_a = applyPlaneFunction(a, plane_normal, plane_point);
 	float f_b = applyPlaneFunction(b, plane_normal, plane_point);
 
-
 	if (signbit(f_a) == signbit(f_b)) {
 
 		// a and b are on the same side of the plane.. so there is no clipping to be done.
-		// TODO: if a,b are not in the viewing volume then i should not draw the line. but how do i know
+
+		// if a,b are not in the viewing volume then i should not draw the line. but how do i know
 		// if they are in the viewing volume in general? for now, i will see it this way: if f(p) < 0,
 		// then f(p) is 'inside' the plane and i will keep the point. otherwise if f(p) > 0 then i discard it.
 		if (f_a >= 0) {
@@ -220,14 +280,13 @@ bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane
 			b = vec4(0,0,0,1);
 			return true;
 		}
+
 		// they are both inside so there is no clipping to be done
 		return false;
 	}
 
 	// a,b are on different sides of the plane.. so now i need to decide which how to shorten it. 
-	// which is the point that lies outside the plane? again i will decide that if f(a) < 0, i will keep that point.
-	// first, we make sure that 'a' is the point we keep (on the 'inside' of the plane) 
-		
+	
 	//so we want to find when the line AB (defined by equation A + t(B-A) = 0) intersects the plane (N,P-Q) = 0.
 	//we do this by plugging the expression for the first equation into the variable P in the second equation. 
 	//doing so, we get the following formula for t
@@ -274,41 +333,6 @@ void clipLineSymmetricCube(vec4 &a, vec4 &b, bool print_data)
 	}
 #endif
 
-}
-
-void A2::initMatrices()
-{
-	//translate by 2 units towards the negative z-axis
-
-	m_model[0] = glm::vec4(m_scaleAdj.left(), 0, 0, 0);
-	m_model[1] = glm::vec4(0, m_scaleAdj.middle(), 0, 0);
-	m_model[2] = glm::vec4(0, 0, m_scaleAdj.right(), 0);
-	m_model[3] = glm::vec4(0, 0, -0.5f, 1.0f); // represents a translation of the origin
-
-	updateCameraMatrix(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-	//cosntruct the matrix for an orthographic projection. 
-	//for now let's just use these default values, but i should be using const values 
-	
-	updateProjectionMatrix(3.0f, 3.0f, -1.0f, -5.0f);
-
-	//Keep the viewport matrix to be the identity for now..
-/*
-	// the viewport matrix is always constant since the screen dimensions and canonical view volume are constant
-	m_viewport[0] = glm::vec4( (float) SCREEN_WIDTH/2, 0, 0, (float) (SCREEN_WIDTH-1)/2 );	
-	m_viewport[2] = glm::vec4( 0, 0, 1, 0 );
-	m_viewport[3] = glm::vec4( 0, 0, 0, 1 );
-*/
-
-#ifndef NDEBUG
-	cout << "MODEL:" << endl << m_model << endl;
-	cout << "CAMERA:" << endl << m_camera << endl;
-	cout << "PROJECTION:" <<  endl << m_proj << endl;
-	cout << "VIEWPORT:" << endl << m_viewport << endl;
-	cout << endl;
-#endif
-
-	m_final = m_viewport * m_proj * m_camera * m_model;
 }
 
 //----------------------------------------------------------------------------------------
@@ -436,7 +460,6 @@ void A2::drawLine(
  */
 void A2::appLogic()
 {
-
 	/*
 	 * Game plan: For a line PQ in model coordinates:
 	 *
@@ -542,6 +565,13 @@ void A2::appLogic()
 
 		drawLine({p_proj.x, p_proj.y}, {q_proj.x, q_proj.y});
 	}
+
+	//Update the matrices now
+	
+
+	//it doesn't actually matter what we put for now, just that we call it
+	//TODO: make the parameters reflect the above statemnet.. no need to pass vectors in
+	updateWorldMatrix(vec3(), vec3(), vec3());
 	firstRun = false;
 
 }
@@ -717,6 +747,39 @@ bool A2::keyInputEvent (
 ) {
 	bool eventHandled(false);
 
+	//TODO: for now we just implement scaling based on up and down
+	// arrow key presses. replace this eventually so that it is done with mouse	
+
+	if (action == GLFW_PRESS) {
+		if (key == GLFW_KEY_UP) {
+			m_translateObjAdj.incrementZ();
+		} 
+
+		if (key == GLFW_KEY_RIGHT) {
+			m_translateObjAdj.incrementX();
+		}
+
+		if (key == GLFW_KEY_LEFT) {
+			m_translateObjAdj.incrementX(false);
+		}
+
+		if (key == GLFW_KEY_DOWN) {
+			m_translateObjAdj.incrementZ(false);
+		}
+	}
+
+	//Check if the key is in the map first
+	if (m_keyMap.count(key) > 0) {
+		
+		if (action == GLFW_PRESS) {
+			m_keyMap[key] = true;
+		} 
+
+		if (action == GLFW_RELEASE) {
+			m_keyMap[key] = false;
+		} 
+	}
+
 	// Fill in with event handling code...
 
 	return eventHandled;
@@ -746,41 +809,63 @@ void ViewAdjustor::ClampedFloat::incrementValue(bool positive)
 	value = new_value;
 }
 
-void ViewAdjustor::initLeft(float value, float increment, float max, float min) 
+void ViewAdjustor::initX(float value, float increment, float max, float min) 
 {
-	left_ = ClampedFloat(value, increment, max, min);
+	x_ = ClampedFloat(value, increment, max, min);
 }
 
-void ViewAdjustor::initMiddle(float value, float increment, float max, float min) 
+void ViewAdjustor::initY(float value, float increment, float max, float min) 
 {
-	middle_ = ClampedFloat(value, increment, max, min);
+	y_ = ClampedFloat(value, increment, max, min);
 }
 
-void ViewAdjustor::initRight(float value, float increment, float max, float min) 
+void ViewAdjustor::initZ(float value, float increment, float max, float min) 
 {
-	right_ = ClampedFloat(value, increment, max, min);
+	z_ = ClampedFloat(value, increment, max, min);
 }
 
 void ViewAdjustor::initAll(float value, float increment, float max, float min)
 {
-	initLeft(value, increment, max, min);	
-	initRight(value, increment, max, min);	
-	initMiddle(value, increment, max, min);	
+	initX(value, increment, max, min);	
+	initZ(value, increment, max, min);	
+	initY(value, increment, max, min);	
 }
 
 // Getters 
-float ViewAdjustor::left() const
+float ViewAdjustor::x() const
 {
-	return left_.value;
+	return x_.value;
 }
 
-float ViewAdjustor::right() const
+float ViewAdjustor::y() const
 {
-	return right_.value;
+	return y_.value;
 }
 
-float ViewAdjustor::middle() const
+float ViewAdjustor::z() const
 {
-	return middle_.value;
+	return z_.value;
 }
 
+
+void ViewAdjustor::incrementX(bool positive)
+{
+	x_.incrementValue(positive);
+}
+
+void ViewAdjustor::incrementY(bool positive)
+{
+	y_.incrementValue(positive);
+}
+
+void ViewAdjustor::incrementZ(bool positive)
+{
+	z_.incrementValue(positive);
+}
+
+void ViewAdjustor::incrementAll(bool positive)
+{
+	incrementX(positive);
+	incrementZ(positive);
+	incrementY(positive);
+}
