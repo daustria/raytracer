@@ -42,6 +42,8 @@ A2::A2()
 	m_viewport(1.0f)
 {
 	m_keyMap = {
+		//Stores all the keys we use in the program, and whether they are
+		//held or not 
 		{GLFW_KEY_O, 0},
 		{GLFW_KEY_E, 0},
 		{GLFW_KEY_P, 0},
@@ -83,8 +85,8 @@ void A2::init()
 
 	initCubeVertices();
 	initCubeIndices();
-	initMatrices();
 	initCoordinateSystems();
+	initMatrices();
 }
 
 //----------------------------------------------------------------------------------------
@@ -157,16 +159,18 @@ void A2::initCoordinateSystems()
 	float default_scaling = 0.1f;
 	float default_max = 10.0f;
 
-	// scale view 
-	m_scaleAdj.initAll(1.0f, default_scaling, 3.0f, 0.0f);
+	// Model Scale
+	m_scaleAdj.initAll(0.5f, default_scaling, 3.0f, 0.0f);
 
 	// Eye translation view 	
-	m_translateEyeAdj.initAll(0, default_scaling, 0.5f, -0.5f);
+	m_translateEyeAdj.initX(0, default_scaling, 10.0f, -10.0f);
+	m_translateEyeAdj.initY(0, default_scaling, 10.0f, -10.0f);
+	m_translateEyeAdj.initZ(0, default_scaling, 100.0f, -10.0f);
 
 	//Object translation
-	m_translateObjAdj.initX(0, default_scaling, 10.0f, -10.0f);
+	m_translateObjAdj.initX(0.0f, default_scaling, 10.0f, -10.0f);
 	m_translateObjAdj.initY(0, default_scaling, 10.0f, -10.0f);
-	m_translateObjAdj.initZ(-1.0f, -1*default_scaling, 5.0f, -10.0f);
+	m_translateObjAdj.initZ(-2.0f, default_scaling, 5.0f, -100.0f);
 }
 
 //----------------------------------------------------------------------------------------
@@ -180,8 +184,12 @@ void A2::updateWorldMatrix()
 }
 
 //----------------------------------------------------------------------------------------
-void A2::updateCameraMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up)
+void A2::updateCameraMatrix()
 {
+	vec3 eye{m_translateEyeAdj.x, m_translateEyeAdj.y, m_translateEyeAdj.z};
+	vec3 gaze{0.0f, 0.0f, -1.0f};
+	vec3 up{0.0f, 1.0f, 0.0f};
+
 	// we can derive a basis of R^3 consisting of these vectors, call it {u,v,w}
 
 	// Open question: what is the point of multiplying by -1?
@@ -220,7 +228,7 @@ void A2::updateProjectionMatrix(float r, float t, float n, float f)
 	m_persp[0] = glm::vec4( n, 0, 0, 0 );
 	m_persp[1] = glm::vec4( 0, n, 0, 0 );
 	m_persp[2] = glm::vec4( 0, 0, n+f, 1.0f );
-	m_persp[3] = glm::vec4( 0, 0, -1.0f *n*f, 0 );
+	m_persp[3] = glm::vec4( 0, 0, -1.0f*n*f, 0 );
 
 	//the perspective matrix maps the perspective view volume to the orthographic view volume.
 	//the orthographic view volume is mapped to the canonical view volume using the orthographic projection matrix.
@@ -234,13 +242,12 @@ void A2::updateProjectionMatrix(float r, float t, float n, float f)
 void A2::initMatrices()
 {
 	updateWorldMatrix();
-
-	updateCameraMatrix(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	updateCameraMatrix();
 
 	//cosntruct the matrix for an orthographic projection. 
 	//for now let's just use these default values, but i should be using const values 
 	
-	updateProjectionMatrix(3.0f, 3.0f, -1.0f, -5.0f);
+	updateProjectionMatrix(1.0f, 1.0f, -1.0f, -5.0f);
 
 	//Keep the viewport matrix to be the identity for now..
 /*
@@ -268,7 +275,9 @@ float applyPlaneFunction(const vec4 &v, const vec4 &plane_normal, const vec4 &pl
 }
 
 // clips the line against the plane. modifies a,b so that the line from a to b is 
-// the new line after clipping. returns true if we discard both points, false otherwise
+// the new line after clipping. if a,b are outside the plane (based on the provided normal)
+// then they are both set to the origin in homogeneous coordinates [0:0:0:1]
+// returns true if clipping was performed, false otherwise
 bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane_point)
 {	
 	float f_a = applyPlaneFunction(a, plane_normal, plane_point);
@@ -286,7 +295,6 @@ bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane
 			b = vec4(0,0,0,1);
 			return true;
 		}
-
 		// they are both inside so there is no clipping to be done
 		return false;
 	}
@@ -299,9 +307,10 @@ bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane
 	
 	float t = f_a / glm::dot(plane_normal, a-b);
 	
-	//make sure that t is in the interval of [0,1] so that its actually on the line [A,B]
+	//make sure that t is in the interval of [0,1] so that its actually on the line between A and B
 	//assert(0 <= t && t <= 1);
-	//Now let B to be the intersection point, instead of the point outside the plane
+
+	//Now compute the intersection point of the line against the plane
 	vec4 intersection = a + t*(b-a);	
 
 	//if A is on the outside, make it the intersection point
@@ -312,32 +321,31 @@ bool clipLinePlane(vec4 &a, vec4 &b, const vec4 &plane_normal, const vec4 &plane
 		b = intersection;
 	}
 
-	return false;
+	return true;
 }
 
-void clipLineSymmetricCube(vec4 &a, vec4 &b, bool print_data)
+bool clipLineSymmetricCube(vec4 &a, vec4 &b, bool print_data)
 {
 
-#ifndef NDEBUG
-	if(print_data) {
-		printf("A2::%s() | before clipping: a {%f,%f,%f} b {%f,%f,%f}\n", __func__, a.x, a.y, a.z, b.x, b.y, b.z);
-	}
-#endif
 	bool clipped = false;
-	clipped |= clipLinePlane(a, b, vec4(-1,0,0,1), vec4(-1,0,0,1)); // left face
-	clipped |= clipLinePlane(a, b, vec4(1,0,0,1), vec4(1,0,0,1)); //right
 
-	clipped |= clipLinePlane(a, b, vec4(0,1,0,1), vec4(0,1,0,1)); // top
-	clipped |= clipLinePlane(a, b, vec4(0,-1,0,1), vec4(0,-1,0,1)); // bottom
+	// I don't know why this is true, but it seems if we want f(P) = (N,P-Q) to be negative when P is 'inside' the plane,
+	// our normals N need to point towards the cube. This is contrary to what we saw when we clipped against the near plane
+	// in camera coordinates. When we did that, I made it so that the normal is N = (0,0,1), pointing 'away' from the near plane.
+	//Regardless, these choice of normals give me the desired clipping behaviour, so I'll just take it
+	
+	clipped |= clipLinePlane(a, b, vec4(1,0,0,1), vec4(-1,0,0,1)); // left face
+	clipped |= clipLinePlane(a, b, vec4(-1,0,0,1), vec4(1,0,0,1)); //right
 
-	clipped |= clipLinePlane(a, b, vec4(0,0,1,1), vec4(0,0,1,1)); // near
+	clipped |= clipLinePlane(a, b, vec4(0,-1,0,1), vec4(0,1,0,1)); // top
+	clipped |= clipLinePlane(a, b, vec4(0,1,0,1), vec4(0,-1,0,1)); // bottom
+
+	// We already clip against the near plane in camera coordinates, so no need to do it again 
+	//clipped |= clipLinePlane(a, b, vec4(0,0,1,1), vec4(0,0,1,1)); // near
+	
 	clipped |= clipLinePlane(a, b, vec4(0,0,-1,1), vec4(0,0,-1,1)); // far
 
-#ifndef NDEBUG
-	if(print_data && clipped) {
-		printf("A2::%s() | after clipping: a {%f,%f,%f} b {%f,%f,%f}\n", __func__, a.x, a.y, a.z, b.x, b.y, b.z );
-	}
-#endif
+	return clipped;
 
 }
 
@@ -466,8 +474,13 @@ void A2::drawLine(
  */
 void A2::appLogic()
 {
+	// Place per frame, application logic here ...
+	// Call at the beginning of frame, before drawing lines:
+	initLineData();
+	setLineColour(vec3(1.0f, 0.7f, 0.8f));
+
 	/*
-	 * Game plan: For a line PQ in model coordinates:
+	 * For a line PQ in model coordinates:
 	 *
 	 *  -Move to world coordinates
 	 *  -Clip against the near plane in world coordinates. only the near plane.
@@ -477,14 +490,13 @@ void A2::appLogic()
 	 *  -Move to viewport coordinates by applying the viewport transform (can omit for now since viewport is just identity)
 	 *
 	 */
-	static bool firstRun(true);
-	// Place per frame, application logic here ...
-	// Call at the beginning of frame, before drawing lines:
-	initLineData();
 
-	setLineColour(vec3(1.0f, 0.7f, 0.8f));
+#ifndef NDEBUG
+	if(m_printLineDebugInfo) {
+		printf(" ================================= Line Coordinates ========================================\n");
+	}
+#endif
 
-	//draw each line	
 	for(int i = 0; i+1 < m_cubeLineIndices.size(); i += 2)
 	{
 		int p_index = m_cubeLineIndices[i];
@@ -496,7 +508,7 @@ void A2::appLogic()
 		vec4 q_model = vec4{m_cubeVertices[q_index], 1};
 
 #ifndef NDEBUG
-		if(firstRun) {
+		if(m_printLineDebugInfo) {
 			printf("==============================================================\n");
 			printf("A2::%s() | Line in model space: (%f,%f,%f,%f) -- (%f,%f,%f,%f)\n", __func__, 
 					p_model.x, p_model.y, p_model.z, p_model.w, q_model.x, q_model.y, q_model.z, q_model.w );
@@ -512,19 +524,24 @@ void A2::appLogic()
 		//Clip the line against the near plane, keep normal pointing outwards
 		// TODO: For now this assumes the near plane is at (0,0,-1,1). but we should 
 		// have variable near planes. 
-		bool discarded = clipLinePlane(p_cam, q_cam, vec4(0,0,1,1), vec4(0,0,-1,1));
 
-		if(firstRun) {
+		if(m_printLineDebugInfo) {
 #ifndef NDEBUG
 			printf("A2::%s() | Line in camera space: (%f,%f,%f,%f) -- (%f,%f,%f,%f)\n", __func__, 
 					p_cam.x, p_cam.y, p_cam.z, p_cam.w, q_cam.x, q_cam.y, q_cam.z, q_cam.w);
 #endif
 		}
 
+		clipLinePlane(p_cam, q_cam, vec4(0,0,1,1), vec4(0,0,-1,1));
 
-		if (discarded) {
+		vec4 origin{0,0,0,1};
+		bool p_eq_origin = glm::all(glm::equal(p_cam, origin));
+		bool q_eq_origin = glm::all(glm::equal(q_cam, origin));
+
+		// If both p and q are the point [0:0:0:1] we don't bother drawing the line 
+		if (p_eq_origin && q_eq_origin) {
 #ifndef NDEBUG
-			if(firstRun) {
+			if(m_printLineDebugInfo) {
 				printf("A2::%s() | both points in line are clipped, not drawing this line...\n", __func__);
 			}
 #endif
@@ -532,14 +549,13 @@ void A2::appLogic()
 		}
 		
 
-
 		// now do the projective transformation, getting it in homogeneous coordinates	
 
 		vec4 p_proj = m_proj*p_cam;
 		vec4 q_proj = m_proj*q_cam;
 
 #ifndef NDEBUG
-		if(firstRun) {
+		if(m_printLineDebugInfo) {
 			printf("A2::%s() | Line in homogeneous coordinates: [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
 					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w );
 		}
@@ -549,10 +565,10 @@ void A2::appLogic()
 
 		// The projective transformation moves the frustum to the symmetric cube [-1,1]^3. We now clip against this cube.
 
-		clipLineSymmetricCube(p_proj, q_proj, false);
+		bool clipped = clipLineSymmetricCube(p_proj, q_proj, m_printLineDebugInfo);
 
 #ifndef NDEBUG
-		if(firstRun) {
+		if(m_printLineDebugInfo && clipped ) {
 			printf("A2::%s() | Line after clipping to [-1,1]^3 : [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
 					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w);
 		}
@@ -563,7 +579,7 @@ void A2::appLogic()
 		homogenize4thChart(q_proj);
 
 #ifndef NDEBUG
-		if(firstRun) {
+		if(m_printLineDebugInfo) {
 			printf("A2::%s() | Line after homogenizing: [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
 					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w);
 		}
@@ -573,10 +589,9 @@ void A2::appLogic()
 	}
 
 	//Update the matrices now
-	
-
 	updateWorldMatrix();
-	firstRun = false;
+	updateCameraMatrix();
+	m_printLineDebugInfo = false;
 
 }
 
@@ -603,6 +618,7 @@ void A2::guiLogic()
 
 		ImGui::Text( "Scale Model: (%f,%f,%f)", m_scaleAdj.x, m_scaleAdj.y, m_scaleAdj.z);
 		ImGui::Text( "Translate Model: (%f,%f,%f)", m_translateObjAdj.x, m_translateObjAdj.y, m_translateObjAdj.z);
+		ImGui::Text( "Translate View: (%f,%f,%f)", m_translateEyeAdj.x, m_translateEyeAdj.y, m_translateEyeAdj.z);
 
 		// Create Button, and check if it was clicked:
 		if( ImGui::Button( "Quit Application" ) ) {
@@ -649,7 +665,7 @@ void A2::draw()
 	glBindVertexArray(m_vao);
 
 	m_shader.enable();
-		glDrawArrays(GL_LINES, 0, m_vertexData.numVertices); // why arent these lines being drawn??
+		glDrawArrays(GL_LINES, 0, m_vertexData.numVertices); 
 	m_shader.disable();
 
 	// Restore defaults
@@ -674,6 +690,9 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 	//If the left mouse button is held, adjust the X-axis coordinate systems	
 	if (m_keyMap[GLFW_MOUSE_BUTTON_LEFT]) {
 		if(m_keyMap[GLFW_KEY_E]) {
+			m_translateEyeAdj.incrementX(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_T]) {
 			m_translateObjAdj.incrementX(horizontal_mouse_offset, offset_sign);
 		}
 	}
@@ -681,6 +700,9 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 	//If middle mouse button is held, adjust the Y-axis coordinate systems...
 	if (m_keyMap[GLFW_MOUSE_BUTTON_MIDDLE]) {
 		if(m_keyMap[GLFW_KEY_E]) {
+			m_translateEyeAdj.incrementY(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_T]) {
 			m_translateObjAdj.incrementY(horizontal_mouse_offset, offset_sign);
 		}
 	}
@@ -688,6 +710,9 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 	//If right mouse button...
 	if (m_keyMap[GLFW_MOUSE_BUTTON_RIGHT]) {
 		if(m_keyMap[GLFW_KEY_E]) {
+			m_translateEyeAdj.incrementZ(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_T]) {
 			m_translateObjAdj.incrementZ(horizontal_mouse_offset, offset_sign);
 		}
 
@@ -798,6 +823,16 @@ bool A2::keyInputEvent (
 		int mods
 ) {
 	bool eventHandled(false);
+
+	// Handle pressing D separately, this just prints some debug information
+	// and is not part of the assigment
+#ifndef NDEBUG
+	if (action == GLFW_PRESS) {
+		if (key == GLFW_KEY_D) {
+			m_printLineDebugInfo = true;
+		}
+	}
+#endif
 
 	//Check if the key is in the map first
 	if (m_keyMap.count(key) > 0) {

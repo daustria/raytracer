@@ -86,7 +86,7 @@ protected:
 	// near and far planes will be z=n, z=f where we imagine n,f < 0
 	void updateProjectionMatrix(float r, float t, float n, float f);
 
-	void updateCameraMatrix(glm::vec3 eye, glm::vec3 gaze, glm::vec3 up);	
+	void updateCameraMatrix();
 	
 	void reset(); // initialize the relevant variables to their starting values
 
@@ -128,7 +128,7 @@ protected:
 	//Tracking horizontal movement of the mouse
 	double m_oldMouseX = 0.0f;
 
-	
+	bool m_printLineDebugInfo = true;
 };
 
 // divides all coordinates by the 4th, assumes it is non-zero
