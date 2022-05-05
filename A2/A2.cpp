@@ -16,9 +16,6 @@ using namespace std;
 
 using namespace glm;
 
-std::vector<glm::vec3> A2::m_cubeVertices;
-std::vector<int> A2::m_cubeLineIndices; 
-
 //----------------------------------------------------------------------------------------
 // Constructor
 VertexData::VertexData()
@@ -86,6 +83,7 @@ void A2::init()
 	initCubeVertices();
 	initCubeIndices();
 	initCoordinateSystems();
+	initCoordinateFrameVertices();
 	initMatrices();
 }
 
@@ -152,6 +150,18 @@ void A2::initCubeIndices()
 
 }
 
+//----------------------------------------------------------------------------------------
+void A2::initCoordinateFrameVertices()
+{
+	m_coordinateFrameLines.reserve(3);
+
+	vec3 origin{0,0,0};
+	float frame_length = 0.5f;
+
+	m_coordinateFrameLines.push_back({origin, origin + vec3{frame_length,0,0}}); 
+	m_coordinateFrameLines.push_back({origin, origin + vec3{0,-frame_length,0}});
+	m_coordinateFrameLines.push_back({origin, origin + vec3{0,0,-frame_length}});
+}
 
 //----------------------------------------------------------------------------------------
 void A2::initCoordinateSystems()
@@ -159,33 +169,109 @@ void A2::initCoordinateSystems()
 	float default_scaling = 0.1f;
 	float default_max = 10.0f;
 
+
+	//TODO: Make the scaling based on the number of pixels...
+	// This isnt really so important though, hard coded is fine since ill probably
+	// be the only person who ever runs this program
+	
 	// Model Scale
-	m_scaleAdj.initAll(0.5f, default_scaling, 3.0f, 0.0f);
+	m_scaleObjAdj.initAll(0.5f, default_scaling, 3.0f, 0.0f);
+
+	// Model Rotation
+	m_rotateObjAdj.initAll(0.0f, 0.5f, 360.0f, -360.0f);
+
+	// Model translation
+	m_translateObjAdj.initX(0.0f, default_scaling/10, 10.0f, -10.0f);
+	m_translateObjAdj.initY(0, default_scaling/10, 10.0f, -10.0f);
+	m_translateObjAdj.initZ(-2.0f, default_scaling/10, 5.0f, -100.0f);
 
 	// Eye translation view 	
 	m_translateEyeAdj.initX(0, default_scaling, 10.0f, -10.0f);
 	m_translateEyeAdj.initY(0, default_scaling, 10.0f, -10.0f);
 	m_translateEyeAdj.initZ(0, default_scaling, 100.0f, -10.0f);
 
-	//Object translation
-	m_translateObjAdj.initX(0.0f, default_scaling, 10.0f, -10.0f);
-	m_translateObjAdj.initY(0, default_scaling, 10.0f, -10.0f);
-	m_translateObjAdj.initZ(-2.0f, default_scaling, 5.0f, -100.0f);
+	// Eye Rotation
+	m_rotateEyeAdj.initAll(0.0f, 0.5f, 360.0f, -360.0f);
+}
+
+//Turns m into a rotation matrix along the x-axis by rad radians 
+void rotation_matrix_x_axis(mat3 &m, float rad)
+{
+	m[0] = vec3(1, 0, 0);
+	m[1] = vec3(0, cos(rad) , sin(rad));
+	m[2] = vec3(0, -sin(rad), cos(rad));	
+}
+
+//Next two are similar to the above
+void rotation_matrix_y_axis(mat3 &m, float rad)
+{
+	m[0] = vec3(cos(rad), 0, -sin(rad));
+	m[1] = vec3(0, 1, 0);
+	m[2] = vec3(sin(rad), 0, cos(rad));
+}
+
+void rotation_matrix_z_axis(mat3 &m, float rad)
+{
+	m[0] = vec3(cos(rad), sin(rad), 0);
+	m[1] = vec3(-sin(rad), cos(rad), 0);
+	m[2] = vec3(0, 0, 1);
+}
+
+// turns m into a matrix formed by rotating along the z-axis by z_angle radians, 
+// then rotationg along y-axis by y_angle radians, then x-axis by x_angle rad
+void generate_rotation_matrix(mat3 &m, float x_angle, float y_angle, float z_angle)
+{
+	mat3 rx, ry, rz;
+
+	rotation_matrix_x_axis(rx, x_angle);
+	rotation_matrix_y_axis(ry, y_angle);
+	rotation_matrix_z_axis(rz, z_angle);
+
+	m = rx*ry*rz;	
 }
 
 //----------------------------------------------------------------------------------------
 void A2::updateWorldMatrix()
 {
 
-	m_model[0] = glm::vec4(m_scaleAdj.x, 0, 0, 0);
-	m_model[1] = glm::vec4(0, m_scaleAdj.y, 0, 0);
-	m_model[2] = glm::vec4(0, 0, m_scaleAdj.z, 0);
+	mat3 scaling_transform(1.0f);
+	mat3 rotate_x(1.0f);
+	mat3 rotate_y(1.0f);
+	mat3 rotate_z(1.0f);
+
+	// Scaling transform
+	scaling_transform[0] = glm::vec3(m_scaleObjAdj.x, 0, 0);
+	scaling_transform[1] = glm::vec3(0, m_scaleObjAdj.y, 0);
+	scaling_transform[2] = glm::vec3(0, 0, m_scaleObjAdj.z);
+
+	// Generate rotation matrix
+	mat3 rotations;
+	float x_angle = glm::radians(m_rotateObjAdj.x);
+	float y_angle = glm::radians(m_rotateObjAdj.y);
+	float z_angle = glm::radians(m_rotateObjAdj.z);
+	generate_rotation_matrix(rotations, x_angle, y_angle, z_angle);
+
+	mat3 final_model_transform = rotations*scaling_transform;
+
+	// model matrix for the cube
+	m_model[0] = glm::vec4(final_model_transform[0], 0);
+	m_model[1] = glm::vec4(final_model_transform[1], 0);
+	m_model[2] = glm::vec4(final_model_transform[2], 0);
 	m_model[3] = glm::vec4(m_translateObjAdj.x, m_translateObjAdj.y, m_translateObjAdj.z, 1.0f); // represents a translation of the origin
+
+	// model matrix for the model coordinate frames (no scaling)
+	m_model_no_scale[0] = glm::vec4(rotations[0], 0);
+	m_model_no_scale[1] = glm::vec4(rotations[1], 0);
+	m_model_no_scale[2] = glm::vec4(rotations[2], 0);
+	m_model_no_scale[3] = glm::vec4(m_translateObjAdj.x, m_translateObjAdj.y, m_translateObjAdj.z, 1.0f); 
+
 }
 
 //----------------------------------------------------------------------------------------
 void A2::updateCameraMatrix()
 {
+	mat3 rotate_x, rotate_y, rotate_z;
+
 	vec3 eye{m_translateEyeAdj.x, m_translateEyeAdj.y, m_translateEyeAdj.z};
 	vec3 gaze{0.0f, 0.0f, -1.0f};
 	vec3 up{0.0f, 1.0f, 0.0f};
@@ -193,20 +279,33 @@ void A2::updateCameraMatrix()
 	// we can derive a basis of R^3 consisting of these vectors, call it {u,v,w}
 
 	// Open question: what is the point of multiplying by -1?
-	glm::vec3 w = glm::normalize(gaze) * -1.0f;
-	glm::vec3 u = glm::normalize(glm::cross(up, w));
-	glm::vec3 v = glm::cross(u,w);
+	vec3 w = glm::normalize(gaze) * -1.0f;
+	vec3 u = glm::normalize(glm::cross(up, w));
+	vec3 v = glm::cross(u,w);
 
+	// Generate rotation matrix to rotate u,v,w 
+	mat3 rotations;
+	float x_angle = glm::radians(m_rotateEyeAdj.x);
+	float y_angle = glm::radians(m_rotateEyeAdj.y);
+	float z_angle = glm::radians(m_rotateEyeAdj.z);
+	generate_rotation_matrix(rotations, x_angle, y_angle, z_angle);
+
+	// i need to rotate u,v,w now
+	u = rotations*u;
+	v = rotations*v;
+	w = rotations*w;
+
+	// now construct the camera matrix with the modified u,v,w basis representing camera coordinates
 	m_camera[0] = vec4( u.x, u.y, u.z, 0 );
 	m_camera[1] = vec4( v.x, v.y, v.z, 0 );
 	m_camera[2] = vec4( w.x, w.y, w.z, 0 );
 	m_camera[3] = vec4( eye.x, eye.y, eye.z, 1 );
 
-	// before the matrix, notice that the above is a matrix taking the {u,v,w} basis to the 
-	// {x,y,z}. to see this, consider the result after applying the map to a point P = (u_0, v_0, w_0, 1) in
-	// u,v,w coordinates. howeveer we want the matrix taking the {x,y,z} basis to {u,v,w}, so we take the inverse.
+	// notice that the above is a matrix taking the {u,v,w} coordiantes (where the origin is eye) to {x,y,z} coordinates
+	// where the origin is (0,0,0).
+	// to see this, consider the result after applying the map to a point P = (u_0, v_0, w_0, 1) in
+	// however we want the matrix taking the {x,y,z} basis to {u,v,w}, so we take the inverse.
 	m_camera = glm::inverse(m_camera);	
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -468,6 +567,101 @@ void A2::drawLine(
 	m_vertexData.numVertices += 2;
 }
 
+std::pair<vec2, vec2> A2::processLine(const glm::vec4 &p, const glm::vec4 &q, bool omit_model_transform, bool omit_model_scale)
+{
+		vec4 p_model{p};
+		vec4 q_model{q};
+
+#ifndef NDEBUG
+		if(m_printLineDebugInfo) {
+			printf("========================================================================================\n");
+			printf("A2::%s() | Line in model space: (%f,%f,%f,%f) -- (%f,%f,%f,%f)\n", __func__, 
+					p_model.x, p_model.y, p_model.z, p_model.w, q_model.x, q_model.y, q_model.z, q_model.w );
+		}
+#endif
+
+		//Move to camera coordinates
+	
+		mat4 model(1.0f);	
+		if(omit_model_scale) {
+			model = m_model_no_scale;
+		} else if (omit_model_transform) {
+			//Do nothing, keep the model as the identity matrix
+		} else {
+			// Use the normal model matrix 
+			model = m_model;
+		}
+		mat4 model_to_camera = m_camera*model;
+		
+		vec4 p_cam = model_to_camera* p_model;
+		vec4 q_cam = model_to_camera * q_model;
+
+		//Clip the line against the near plane, keep normal pointing outwards
+		// TODO: For now this assumes the near plane is at (0,0,-1,1). but we should 
+		// have variable near planes. 
+
+		if(m_printLineDebugInfo) {
+#ifndef NDEBUG
+			printf("A2::%s() | Line in camera space: (%f,%f,%f,%f) -- (%f,%f,%f,%f)\n", __func__, 
+					p_cam.x, p_cam.y, p_cam.z, p_cam.w, q_cam.x, q_cam.y, q_cam.z, q_cam.w);
+#endif
+		}
+
+		clipLinePlane(p_cam, q_cam, vec4(0,0,1,1), vec4(0,0,-1,1));
+
+		vec4 origin{0,0,0,1};
+		bool p_eq_origin = glm::all(glm::equal(p_cam, origin));
+		bool q_eq_origin = glm::all(glm::equal(q_cam, origin));
+
+		// If both p and q are the point [0:0:0:1] we don't bother drawing the line 
+		if (p_eq_origin && q_eq_origin) {
+#ifndef NDEBUG
+			if(m_printLineDebugInfo) {
+				printf("A2::%s() | both points in line are clipped, not drawing this line...\n", __func__);
+			}
+#endif
+
+			return {{0,0}, {0,0}};
+		}
+		
+
+		// now do the projective transformation, getting it in homogeneous coordinates	
+
+		vec4 p_proj = m_proj*p_cam;
+		vec4 q_proj = m_proj*q_cam;
+
+#ifndef NDEBUG
+		if(m_printLineDebugInfo) {
+			printf("A2::%s() | Line in homogeneous coordinates: [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
+					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w );
+		}
+#endif
+		// The projective transformation moves the frustum to the symmetric cube [-1,1]^3. We now clip against this cube.
+
+		bool clipped = clipLineSymmetricCube(p_proj, q_proj, m_printLineDebugInfo);
+
+#ifndef NDEBUG
+		if(m_printLineDebugInfo && clipped ) {
+			printf("A2::%s() | Line after clipping to [-1,1]^3 : [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
+					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w);
+		}
+#endif
+
+		//Divide by the 4th coordinate
+		homogenize4thChart(p_proj);
+		homogenize4thChart(q_proj);
+
+#ifndef NDEBUG
+		if(m_printLineDebugInfo) {
+			printf("A2::%s() | Line after homogenizing: [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
+					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w);
+		}
+#endif
+
+		return {{p_proj.x, p_proj.y}, {q_proj.x, q_proj.y}};
+
+}
+
 //----------------------------------------------------------------------------------------
 /*
  * Called once per frame, before guiLogic().
@@ -497,102 +691,47 @@ void A2::appLogic()
 	}
 #endif
 
+	//Draw the cube line
 	for(int i = 0; i+1 < m_cubeLineIndices.size(); i += 2)
 	{
 		int p_index = m_cubeLineIndices[i];
 		int q_index = m_cubeLineIndices[i+1];
 
-		//Get the line in model coordinates
-		
 		vec4 p_model = vec4{m_cubeVertices[p_index], 1};
 		vec4 q_model = vec4{m_cubeVertices[q_index], 1};
 
-#ifndef NDEBUG
-		if(m_printLineDebugInfo) {
-			printf("==============================================================\n");
-			printf("A2::%s() | Line in model space: (%f,%f,%f,%f) -- (%f,%f,%f,%f)\n", __func__, 
-					p_model.x, p_model.y, p_model.z, p_model.w, q_model.x, q_model.y, q_model.z, q_model.w );
-		}
-#endif
+		pair<vec2, vec2> processed_line = processLine(p_model, q_model, false, false);
 
-		//Move to camera coordinates
-		mat4 model_to_camera = m_camera*m_model;
-		
-		vec4 p_cam = model_to_camera* p_model;
-		vec4 q_cam = model_to_camera * q_model;
-
-		//Clip the line against the near plane, keep normal pointing outwards
-		// TODO: For now this assumes the near plane is at (0,0,-1,1). but we should 
-		// have variable near planes. 
-
-		if(m_printLineDebugInfo) {
-#ifndef NDEBUG
-			printf("A2::%s() | Line in camera space: (%f,%f,%f,%f) -- (%f,%f,%f,%f)\n", __func__, 
-					p_cam.x, p_cam.y, p_cam.z, p_cam.w, q_cam.x, q_cam.y, q_cam.z, q_cam.w);
-#endif
-		}
-
-		clipLinePlane(p_cam, q_cam, vec4(0,0,1,1), vec4(0,0,-1,1));
-
-		vec4 origin{0,0,0,1};
-		bool p_eq_origin = glm::all(glm::equal(p_cam, origin));
-		bool q_eq_origin = glm::all(glm::equal(q_cam, origin));
-
-		// If both p and q are the point [0:0:0:1] we don't bother drawing the line 
-		if (p_eq_origin && q_eq_origin) {
-#ifndef NDEBUG
-			if(m_printLineDebugInfo) {
-				printf("A2::%s() | both points in line are clipped, not drawing this line...\n", __func__);
-			}
-#endif
-			continue;
-		}
-		
-
-		// now do the projective transformation, getting it in homogeneous coordinates	
-
-		vec4 p_proj = m_proj*p_cam;
-		vec4 q_proj = m_proj*q_cam;
-
-#ifndef NDEBUG
-		if(m_printLineDebugInfo) {
-			printf("A2::%s() | Line in homogeneous coordinates: [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
-					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w );
-		}
-#endif
-
-
-
-		// The projective transformation moves the frustum to the symmetric cube [-1,1]^3. We now clip against this cube.
-
-		bool clipped = clipLineSymmetricCube(p_proj, q_proj, m_printLineDebugInfo);
-
-#ifndef NDEBUG
-		if(m_printLineDebugInfo && clipped ) {
-			printf("A2::%s() | Line after clipping to [-1,1]^3 : [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
-					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w);
-		}
-#endif
-
-		//Divide by the 4th coordinate
-		homogenize4thChart(p_proj);
-		homogenize4thChart(q_proj);
-
-#ifndef NDEBUG
-		if(m_printLineDebugInfo) {
-			printf("A2::%s() | Line after homogenizing: [%f:%f:%f:%f] -- [%f:%f:%f:%f]\n", __func__, 
-					p_proj.x, p_proj.y, p_proj.z, p_proj.w, q_proj.x, q_proj.y, q_proj.z, q_proj.w);
-		}
-#endif
-
-		drawLine({p_proj.x, p_proj.y}, {q_proj.x, q_proj.y});
+		drawLine(processed_line.first, processed_line.second);
 	}
 
-	//Update the matrices now
+	setLineColour(vec3(0.5f, 1.0f, 0.0f));
+
+	//Draw the coordinate frames for model and world
+	for(int i = 0; i < m_coordinateFrameLines.size(); ++i) 
+	{
+		vec3 colour(0,0,0);
+		colour[i] = 1.0f;
+
+		setLineColour(colour);
+
+		pair<vec3, vec3> line = m_coordinateFrameLines[i];
+
+		pair<vec2, vec2> model_frame_line = processLine(vec4{line.first, 1}, vec4{line.second, 1}, false, true);
+		pair<vec2, vec2> world_frame_line = processLine(vec4{line.first, 1}, vec4{line.second, 1}, true, false);
+
+
+		drawLine(model_frame_line.first, model_frame_line.second);
+		drawLine(world_frame_line.first, world_frame_line.second);
+	}
+
+	//Update the matrices for the next frame 
 	updateWorldMatrix();
 	updateCameraMatrix();
+	
+	//set the flag to false so that we don't print debug information every frame (the user can
+	//set this flag to true by pressing 'D' if we compile with debug configuration)
 	m_printLineDebugInfo = false;
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -616,9 +755,11 @@ void A2::guiLogic()
 
 		// Add more gui elements here here ...
 
-		ImGui::Text( "Scale Model: (%f,%f,%f)", m_scaleAdj.x, m_scaleAdj.y, m_scaleAdj.z);
+		ImGui::Text( "Scale Model: (%f,%f,%f)", m_scaleObjAdj.x, m_scaleObjAdj.y, m_scaleObjAdj.z);
 		ImGui::Text( "Translate Model: (%f,%f,%f)", m_translateObjAdj.x, m_translateObjAdj.y, m_translateObjAdj.z);
+		ImGui::Text( "Rotate Model: (%f,%f,%f)", m_rotateObjAdj.x, m_rotateObjAdj.y, m_rotateObjAdj.z);
 		ImGui::Text( "Translate View: (%f,%f,%f)", m_translateEyeAdj.x, m_translateEyeAdj.y, m_translateEyeAdj.z);
+		ImGui::Text( "Rotate View: (%f,%f,%f)", m_rotateEyeAdj.x, m_rotateEyeAdj.y, m_rotateEyeAdj.z);
 
 		// Create Button, and check if it was clicked:
 		if( ImGui::Button( "Quit Application" ) ) {
@@ -695,6 +836,12 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 		if(m_keyMap[GLFW_KEY_T]) {
 			m_translateObjAdj.incrementX(horizontal_mouse_offset, offset_sign);
 		}
+		if(m_keyMap[GLFW_KEY_R]) {
+			m_rotateObjAdj.incrementX(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_O]) {
+			m_rotateEyeAdj.incrementX(horizontal_mouse_offset, offset_sign);
+		}
 	}
 
 	//If middle mouse button is held, adjust the Y-axis coordinate systems...
@@ -704,6 +851,15 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 		}
 		if(m_keyMap[GLFW_KEY_T]) {
 			m_translateObjAdj.incrementY(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_R]) {
+			m_rotateObjAdj.incrementY(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_R]) {
+			m_rotateObjAdj.incrementY(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_O]) {
+			m_rotateEyeAdj.incrementY(horizontal_mouse_offset, offset_sign);
 		}
 	}
 
@@ -715,7 +871,12 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 		if(m_keyMap[GLFW_KEY_T]) {
 			m_translateObjAdj.incrementZ(horizontal_mouse_offset, offset_sign);
 		}
-
+		if(m_keyMap[GLFW_KEY_R]) {
+			m_rotateObjAdj.incrementZ(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_O]) {
+			m_rotateEyeAdj.incrementZ(horizontal_mouse_offset, offset_sign);
+		}
 	}
 	
 }
@@ -857,7 +1018,7 @@ void homogenize4thChart(vec4 &v)
 	v = {v.x/v.w, v.y/v.w, v.z/v.w, 1};
 }
 
-//ViewAdjustor-------------------------------------------------------------------------------
+// ViewAdjustor-------------------------------------------------------------------------------
 ViewAdjustor::ClampedFloat::ClampedFloat(float value, float increment, float max, float min) : 
 	value(value), increment(increment), maximum(max), minimum(min) 
 {

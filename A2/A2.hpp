@@ -67,13 +67,20 @@ protected:
 			const glm::vec2 & v1
 	);
 
+	// Takes the line pq in model coordinates, applies the matrix transformations and clipping
+	// to get the two vertices of the corresponding line in normalized device coordinates (NDC) [-1,1]^2
+	std::pair<glm::vec2, glm::vec2> processLine(const glm::vec4 &p, const glm::vec4 &q, bool omit_model_transform, bool omit_model_scale);
+
 	void initCubeVertices();
 	void initCubeIndices();
+
+	void initCoordinateFrameVertices();
 
 	void initMatrices();
 	void updateModelMatrix();
 
 	void initCoordinateSystems();
+
 
 	glm::vec4 transformVertexProjection(glm::vec3 vertex, bool print_data=false);
 
@@ -94,7 +101,14 @@ protected:
 
 	ShaderProgram m_shader;/* Actual program that we attach the shaders to, and link them */
 
+	// Keep the individual rotations for transforming the coordinate frames
+	glm::mat4 m_model_translate;
+	glm::mat4 m_model_rotate;
+	glm::mat4 m_model_scale;
+
 	glm::mat4 m_model; // object space to world space
+	glm::mat4 m_model_no_scale;
+
 	glm::mat4 m_camera; // world space to camera space
 
 	glm::mat4 m_orth_proj; //orthogonal projection matrix
@@ -113,14 +127,25 @@ protected:
 
 	glm::vec3 m_currentLineColour;
 
-	static std::vector<glm::vec3> m_cubeVertices; //this is the data we'll transform to screen coordinates. starts in model coordinates
-	static std::vector<int> m_cubeLineIndices; // holds indices of vertices, describing the order we draw the lines of the cube
+	std::vector<glm::vec3> m_cubeVertices; //this is the data we'll transform to screen coordinates. starts in model coordinates
+	std::vector<int> m_cubeLineIndices; // holds indices of vertices, describing the order we draw the lines of the cube
+
+	// For the coordinat frames, we'll just store lines since each coordinate frame only has 3 lines.
+	// No need to hold indices of vertices to describe only 3 lines.
+	std::vector<std::pair<glm::vec3, glm::vec3>> m_coordinateFrameLines;
 
 	// For implementing the transformations along various coordinate systems..
-	ViewAdjustor m_scaleAdj; //adjust size of object in world space
+	// Model Space
+	ViewAdjustor m_scaleObjAdj; //adjust size of object in world space
 	ViewAdjustor m_translateObjAdj; //adjust origin of object in world space
-	ViewAdjustor m_perspectiveAdj;
+	ViewAdjustor m_rotateObjAdj; //adjust rotation of object in world space
+
+	// Eye Space
 	ViewAdjustor m_translateEyeAdj;
+	ViewAdjustor m_rotateEyeAdj;
+
+
+	ViewAdjustor m_perspectiveAdj;
 
 	// Stores whether a GLFW key is being held
 	std::map<int, bool> m_keyMap;
