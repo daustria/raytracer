@@ -169,13 +169,12 @@ void A2::initCoordinateSystems()
 	float default_scaling = 0.1f;
 	float default_max = 10.0f;
 
-
 	//TODO: Make the scaling based on the number of pixels...
 	// This isnt really so important though, hard coded is fine since ill probably
 	// be the only person who ever runs this program
 	
 	// Model Scale
-	m_scaleObjAdj.initAll(0.5f, default_scaling, 3.0f, 0.0f);
+	m_scaleObjAdj.initAll(0.5f, default_scaling/5, 3.0f, 0.0f);
 
 	// Model Rotation
 	m_rotateObjAdj.initAll(0.0f, 0.5f, 360.0f, -360.0f);
@@ -842,6 +841,9 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 		if(m_keyMap[GLFW_KEY_O]) {
 			m_rotateEyeAdj.incrementX(horizontal_mouse_offset, offset_sign);
 		}
+		if(m_keyMap[GLFW_KEY_S]) {
+			m_scaleObjAdj.incrementX(horizontal_mouse_offset, offset_sign);
+		}
 	}
 
 	//If middle mouse button is held, adjust the Y-axis coordinate systems...
@@ -861,6 +863,9 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 		if(m_keyMap[GLFW_KEY_O]) {
 			m_rotateEyeAdj.incrementY(horizontal_mouse_offset, offset_sign);
 		}
+		if(m_keyMap[GLFW_KEY_S]) {
+			m_scaleObjAdj.incrementY(horizontal_mouse_offset, offset_sign);
+		}
 	}
 
 	//If right mouse button...
@@ -876,6 +881,9 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 		}
 		if(m_keyMap[GLFW_KEY_O]) {
 			m_rotateEyeAdj.incrementZ(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_S]) {
+			m_scaleObjAdj.incrementZ(horizontal_mouse_offset, offset_sign);
 		}
 	}
 	

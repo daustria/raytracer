@@ -144,7 +144,6 @@ protected:
 	ViewAdjustor m_translateEyeAdj;
 	ViewAdjustor m_rotateEyeAdj;
 
-
 	ViewAdjustor m_perspectiveAdj;
 
 	// Stores whether a GLFW key is being held
