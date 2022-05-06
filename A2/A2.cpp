@@ -202,7 +202,7 @@ void A2::initCoordinateSystems()
 	m_perspectiveAdj.initY(-1.0f, default_scaling/10, -0.5f, -3.0f);
 
 	// Far plane location
-	m_perspectiveAdj.initZ(-3.1f, default_scaling/10, -3.0f, -5.0f);
+	m_perspectiveAdj.initZ(-30.0f, default_scaling/5, -3.0f, -60.0f);
 }
 
 //Turns m into a rotation matrix along the x-axis by rad radians 
