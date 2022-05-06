@@ -43,7 +43,7 @@ A2::A2()
 		//held or not 
 		{GLFW_KEY_O, 0},
 		{GLFW_KEY_E, 0},
-		{GLFW_KEY_P, 0},
+		{GLFW_KEY_Q, 0},
 		{GLFW_KEY_R, 0},
 		{GLFW_KEY_T, 0},
 		{GLFW_KEY_S, 0},
@@ -177,7 +177,7 @@ void A2::initCoordinateSystems()
 	m_scaleObjAdj.initAll(0.5f, default_scaling/5, 3.0f, 0.0f);
 
 	// Model Rotation
-	m_rotateObjAdj.initAll(0.0f, 0.5f, 360.0f, -360.0f);
+	m_rotateObjAdj.initAll(0.0f, 2*default_scaling, 360.0f, -360.0f);
 
 	// Model translation
 	m_translateObjAdj.initX(0.0f, default_scaling/10, 10.0f, -10.0f);
@@ -190,7 +190,19 @@ void A2::initCoordinateSystems()
 	m_translateEyeAdj.initZ(0, default_scaling, 100.0f, -10.0f);
 
 	// Eye Rotation
-	m_rotateEyeAdj.initAll(0.0f, 0.5f, 360.0f, -360.0f);
+	m_rotateEyeAdj.initAll(0.0f, default_scaling/2, 360.0f, -360.0f);	
+
+	// Perspective 
+	
+	// FOV angle, in degrees (the angle made from the centre of the near plane to the top of the near plane,
+	// when measured from the eye)
+	m_perspectiveAdj.initX(60.0f, default_scaling/2, 89.0f, 1.0f);
+
+	// Near plane location
+	m_perspectiveAdj.initY(-1.0f, default_scaling/10, -0.5f, -3.0f);
+
+	// Far plane location
+	m_perspectiveAdj.initZ(-3.1f, default_scaling/10, -3.0f, -5.0f);
 }
 
 //Turns m into a rotation matrix along the x-axis by rad radians 
@@ -272,8 +284,8 @@ void A2::updateCameraMatrix()
 	mat3 rotate_x, rotate_y, rotate_z;
 
 	vec3 eye{m_translateEyeAdj.x, m_translateEyeAdj.y, m_translateEyeAdj.z};
-	vec3 gaze{0.0f, 0.0f, -1.0f};
-	vec3 up{0.0f, 1.0f, 0.0f};
+	static const vec3 gaze{0.0f, 0.0f, -1.0f};
+	static const vec3 up{0.0f, 1.0f, 0.0f};
 
 	// we can derive a basis of R^3 consisting of these vectors, call it {u,v,w}
 
@@ -308,8 +320,26 @@ void A2::updateCameraMatrix()
 }
 
 //----------------------------------------------------------------------------------------
-void A2::updateProjectionMatrix(float r, float t, float n, float f)
+void A2::updateProjectionMatrix()
 {
+
+	// For our viewing window we'll go with a symmetric system so that
+	// if the window is defined by parameters l,r,b,t then l = -r and b = -t.
+	
+	// Keep the r parameter constant
+	
+	float n = m_perspectiveAdj.y; //near plane location
+	float f = m_perspectiveAdj.z; //far plane
+	// the height of the viewing window (as measured from the eye) can be derived from
+	// the FOV angle and the distance to the near plane |n|, using the relation tan(x/2) = t/|n|
+	// where x is the FOV angle
+	float fov_angle = glm::radians(m_perspectiveAdj.x);
+	float t = tan(fov_angle)*abs(n);
+	float r = t;
+
+	// the near plane should be closer to the origin than the far plane, and they shouldn't intersect
+	assert(n < 0 && f < n);
+	
 	//for the view matrix we'll just use an orthographic projection for now
 	//page 160 of shirleys book 'fundamentals of computer graphics'
 
@@ -319,8 +349,7 @@ void A2::updateProjectionMatrix(float r, float t, float n, float f)
 	m_orth_proj[3] = glm::vec4( 0, 0, (float) (n+f)/f-n, 1.0f );
 
 
-	//keep the perspective matrix to be the identity, for now
-	
+	//keep the perspective matrix to be the identity, for now	
 	//perspective matrix from shirleys book
 		
 	m_persp[0] = glm::vec4( n, 0, 0, 0 );
@@ -333,7 +362,6 @@ void A2::updateProjectionMatrix(float r, float t, float n, float f)
 	//so , the perspective projection matrix is just the composition
 	
 	m_proj = m_orth_proj * m_persp;
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -341,11 +369,7 @@ void A2::initMatrices()
 {
 	updateWorldMatrix();
 	updateCameraMatrix();
-
-	//cosntruct the matrix for an orthographic projection. 
-	//for now let's just use these default values, but i should be using const values 
-	
-	updateProjectionMatrix(1.0f, 1.0f, -1.0f, -5.0f);
+	updateProjectionMatrix();
 
 	//Keep the viewport matrix to be the identity for now..
 /*
@@ -595,9 +619,6 @@ std::pair<vec2, vec2> A2::processLine(const glm::vec4 &p, const glm::vec4 &q, bo
 		vec4 p_cam = model_to_camera* p_model;
 		vec4 q_cam = model_to_camera * q_model;
 
-		//Clip the line against the near plane, keep normal pointing outwards
-		// TODO: For now this assumes the near plane is at (0,0,-1,1). but we should 
-		// have variable near planes. 
 
 		if(m_printLineDebugInfo) {
 #ifndef NDEBUG
@@ -606,7 +627,9 @@ std::pair<vec2, vec2> A2::processLine(const glm::vec4 &p, const glm::vec4 &q, bo
 #endif
 		}
 
-		clipLinePlane(p_cam, q_cam, vec4(0,0,1,1), vec4(0,0,-1,1));
+		//Clip the line against the near and far plane, keep normal pointing outwards
+		clipLinePlane(p_cam, q_cam, vec4(0,0,1,1), vec4(0,0,m_perspectiveAdj.y,1));
+		clipLinePlane(p_cam, q_cam, vec4(0,0,-1,1), vec4(0,0,m_perspectiveAdj.z,1));
 
 		vec4 origin{0,0,0,1};
 		bool p_eq_origin = glm::all(glm::equal(p_cam, origin));
@@ -677,9 +700,6 @@ void A2::appLogic()
 	 *
 	 *  -Move to world coordinates
 	 *  -Clip against the near plane in world coordinates. only the near plane.
-	 *  -Move to projective coordiantes by applying camera and then perspective projection.
-	 *  -Clip to the symmetric cube viewing volume, [-1,1]^3 
-	 *  -Homogenize the point
 	 *  -Move to viewport coordinates by applying the viewport transform (can omit for now since viewport is just identity)
 	 *
 	 */
@@ -727,6 +747,7 @@ void A2::appLogic()
 	//Update the matrices for the next frame 
 	updateWorldMatrix();
 	updateCameraMatrix();
+	updateProjectionMatrix();
 	
 	//set the flag to false so that we don't print debug information every frame (the user can
 	//set this flag to true by pressing 'D' if we compile with debug configuration)
@@ -754,15 +775,22 @@ void A2::guiLogic()
 
 		// Add more gui elements here here ...
 
-		ImGui::Text( "Scale Model: (%f,%f,%f)", m_scaleObjAdj.x, m_scaleObjAdj.y, m_scaleObjAdj.z);
-		ImGui::Text( "Translate Model: (%f,%f,%f)", m_translateObjAdj.x, m_translateObjAdj.y, m_translateObjAdj.z);
-		ImGui::Text( "Rotate Model: (%f,%f,%f)", m_rotateObjAdj.x, m_rotateObjAdj.y, m_rotateObjAdj.z);
-		ImGui::Text( "Translate View: (%f,%f,%f)", m_translateEyeAdj.x, m_translateEyeAdj.y, m_translateEyeAdj.z);
-		ImGui::Text( "Rotate View: (%f,%f,%f)", m_rotateEyeAdj.x, m_rotateEyeAdj.y, m_rotateEyeAdj.z);
+		ImGui::Text( "Scale Model: (%.2f,%.2f,%.2f)", m_scaleObjAdj.x, m_scaleObjAdj.y, m_scaleObjAdj.z);
+		ImGui::Text( "Translate Model: (%.2f,%.2f,%.2f)", m_translateObjAdj.x, m_translateObjAdj.y, m_translateObjAdj.z);
+		ImGui::Text( "Rotate Model: (%.2f,%.2f,%.2f)", m_rotateObjAdj.x, m_rotateObjAdj.y, m_rotateObjAdj.z);
+		ImGui::Text( "Translate View: (%.2f,%.2f,%.2f)", m_translateEyeAdj.x, m_translateEyeAdj.y, m_translateEyeAdj.z);
+		ImGui::Text( "Rotate View: (%.2f,%.2f,%.2f)", m_rotateEyeAdj.x, m_rotateEyeAdj.y, m_rotateEyeAdj.z);
+		ImGui::Text( "FOV Angle: %.2f (Screen Height: 2x %.2f)", m_perspectiveAdj.x, (tan(glm::radians(m_perspectiveAdj.x)/2)*abs(m_perspectiveAdj.y)));
+		ImGui::Text( "Near Plane: %.2f", m_perspectiveAdj.y);
+		ImGui::Text( "Far Plane: %.2f", m_perspectiveAdj.z);
 
 		// Create Button, and check if it was clicked:
 		if( ImGui::Button( "Quit Application" ) ) {
 			glfwSetWindowShouldClose(m_window, GL_TRUE);
+		}
+
+		if( ImGui::Button( "Reset Paramters" ) ) {
+			initCoordinateSystems();	
 		}
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
@@ -844,6 +872,9 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 		if(m_keyMap[GLFW_KEY_S]) {
 			m_scaleObjAdj.incrementX(horizontal_mouse_offset, offset_sign);
 		}
+		if(m_keyMap[GLFW_KEY_Q]) {
+			m_perspectiveAdj.incrementX(horizontal_mouse_offset, offset_sign);
+		}
 	}
 
 	//If middle mouse button is held, adjust the Y-axis coordinate systems...
@@ -866,6 +897,9 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 		if(m_keyMap[GLFW_KEY_S]) {
 			m_scaleObjAdj.incrementY(horizontal_mouse_offset, offset_sign);
 		}
+		if(m_keyMap[GLFW_KEY_Q]) {
+			m_perspectiveAdj.incrementY(horizontal_mouse_offset, offset_sign);
+		}
 	}
 
 	//If right mouse button...
@@ -884,6 +918,9 @@ void A2::adjustCoordinateAxes(float horizontal_mouse_offset, bool offset_sign)
 		}
 		if(m_keyMap[GLFW_KEY_S]) {
 			m_scaleObjAdj.incrementZ(horizontal_mouse_offset, offset_sign);
+		}
+		if(m_keyMap[GLFW_KEY_Q]) {
+			m_perspectiveAdj.incrementZ(horizontal_mouse_offset, offset_sign);
 		}
 	}
 	

@@ -87,11 +87,8 @@ protected:
 	// Updates the world matrix, with the new rotation, translation, and scale factor set by the user 
 	void updateWorldMatrix();
 
-	// orthographic projection
-	// left and right planes will be x=r, x=-r
-	// top and bottom planes will be y=t, y=-t
-	// near and far planes will be z=n, z=f where we imagine n,f < 0
-	void updateProjectionMatrix(float r, float t, float n, float f);
+	// For perspective projection 
+	void updateProjectionMatrix();
 
 	void updateCameraMatrix();
 	
@@ -144,6 +141,7 @@ protected:
 	ViewAdjustor m_translateEyeAdj;
 	ViewAdjustor m_rotateEyeAdj;
 
+	// FOV angle, near and far planes
 	ViewAdjustor m_perspectiveAdj;
 
 	// Stores whether a GLFW key is being held
