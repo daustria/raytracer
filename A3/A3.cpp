@@ -346,14 +346,15 @@ void A3::guiLogic()
 static void updateShaderUniforms(
 		const ShaderProgram & shader,
 		const GeometryNode & node,
-		const glm::mat4 & viewMatrix
+		const glm::mat4 & viewMatrix,
+		const glm::mat4 & modelMatrix 
 ) {
 
 	shader.enable();
 	{
 		//-- Set ModelView matrix:
 		GLint location = shader.getUniformLocation("ModelView");
-		mat4 modelView = viewMatrix * node.trans;
+		mat4 modelView = viewMatrix * modelMatrix;
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
 		CHECK_GL_ERRORS;
 
@@ -391,58 +392,66 @@ void A3::draw() {
 //----------------------------------------------------------------------------------------
 void A3::renderSceneGraph(const SceneNode & root) {
 
-	// Bind the VAO once here, and reuse for all GeometryNode rendering below.
+	// Bind the VAO once here, and reuse for all GeometryNode rendering
 	glBindVertexArray(m_vao_meshData);
-
-	// This is emphatically *not* how you should be drawing the scene graph in
-	// your final implementation.  This is a non-hierarchical demonstration
-	// in which we assume that there is a list of GeometryNodes living directly
-	// underneath the root node, and that we can draw them in a loop.  It's
-	// just enough to demonstrate how to get geometry and materials out of
-	// a GeometryNode and onto the screen.
-
-	// You'll want to turn this into recursive code that walks over the tree.
-	// You can do that by putting a method in SceneNode, overridden in its
-	// subclasses, that renders the subtree rooted at every node.  Or you
-	// could put a set of mutually recursive functions in this class, which
-	// walk down the tree from nodes of different types
 	
 	static bool firstRun = true;
 
-	if(firstRun) {
-		std::cout << root << std::endl;
-	}
+	m_matrixStack.push(root.get_transform());
 
-	for (const SceneNode * node : root.children) {
-
-		if(firstRun) {
-			std::cout << *node << std::endl;
-		}
-
-		// TODO: Why doesn't this render any of the obejcts in a3mark.lua?
-
-		if (node->m_nodeType != NodeType::GeometryNode)
-			continue;
-
-		const GeometryNode * geometryNode = static_cast<const GeometryNode *>(node);
-
-		updateShaderUniforms(m_shader, *geometryNode, m_view);
-
-		// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
-		BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
-
-		//-- Now render the mesh:
-		m_shader.enable();
-		glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
-		m_shader.disable();
-	}
+	processNode(root);
 
 	firstRun = false;
+
+	//No need to push the root transform off the matrix stack, because we're going to empty it anyway
+	m_matrixStack.reset();
 
 	glBindVertexArray(0);
 	CHECK_GL_ERRORS;
 }
 
+//----------------------------------------------------------------------------------------
+void A3::processNode(const SceneNode &node)
+{
+	m_matrixStack.push(node.get_transform());
+	
+	//Assume for now, that the node is a GeometryNode
+	const GeometryNode *geometryNode = static_cast<const GeometryNode *>(&node);
+
+	updateShaderUniforms(m_shader, *geometryNode, m_view, m_matrixStack.active_transform);
+	
+	// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
+	BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
+
+	//-- Now render the mesh:
+	m_shader.enable();
+	glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
+	m_shader.disable();
+
+	// After rendering the node we process all its children
+	// (make a copy first so we can safely modify the list in the mutual recursion)
+	
+	std::list<SceneNode *> children_copy = node.children;
+	processNodeList(children_copy);
+	// We have rendered all its children, so we can pop off the node's local transform
+	m_matrixStack.pop();
+
+}
+//----------------------------------------------------------------------------------------
+void A3::processNodeList(std::list<SceneNode *> &nodes)
+{
+	if(nodes.empty()) {
+		// bail out
+		return;
+	} 
+
+	SceneNode *first = nodes.front();
+	nodes.pop_front();
+
+	processNode(*first);
+	processNodeList(nodes);
+
+}
 //----------------------------------------------------------------------------------------
 // Draw the trackball circle.
 void A3::renderArcCircle() {
@@ -585,4 +594,11 @@ void A3::MatrixStack::pop()
 
 	// We don't need it anymore
 	matrices.pop();
+}
+
+//----------------------------------------------------------------------------------------
+void A3::MatrixStack::reset()
+{
+	matrices = stack<mat4>();
+	active_transform = mat4(1.0f);
 }

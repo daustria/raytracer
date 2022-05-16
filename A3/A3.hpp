@@ -34,6 +34,9 @@ protected:
 		// Removes the most recently pushed matrix
 		void pop(); 
 
+		// Empties the stack, resets active_transform to the identity
+		void reset();
+
 		// Matrix representing the product of all transformations
 		// in the stack matrices
 		glm::mat4 active_transform;
@@ -65,7 +68,11 @@ protected:
 
 	void initPerspectiveMatrix();
 	void uploadCommonSceneUniforms();
-	void renderSceneGraph(const SceneNode &node);
+	void renderSceneGraph(const SceneNode &root);
+
+	void processNode(const SceneNode &node);
+	void processNodeList(std::list<SceneNode *> &nodes);
+
 	void renderArcCircle();
 
 	glm::mat4 m_perpsective;
