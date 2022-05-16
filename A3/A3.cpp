@@ -257,8 +257,10 @@ void A3::initViewMatrix() {
 //----------------------------------------------------------------------------------------
 void A3::initLightSources() {
 	// World-space position
-	m_light.position = vec3(10.0f, 10.0f, 10.0f);
-	m_light.rgbIntensity = vec3(0.0f); // light
+	//m_light.position = vec3(10.0f, 10.0f, 10.0f);
+	//m_light.rgbIntensity = vec3(0.0f); // light
+	m_light.position = vec3(0.0f, 0.0f, 0.0f);
+	m_light.rgbIntensity = vec3(1.0f, 1.0f, 1.0f); // light
 }
 
 //----------------------------------------------------------------------------------------
@@ -403,9 +405,21 @@ void A3::renderSceneGraph(const SceneNode & root) {
 	// You can do that by putting a method in SceneNode, overridden in its
 	// subclasses, that renders the subtree rooted at every node.  Or you
 	// could put a set of mutually recursive functions in this class, which
-	// walk down the tree from nodes of different types.
+	// walk down the tree from nodes of different types
+	
+	static bool firstRun = true;
+
+	if(firstRun) {
+		std::cout << root << std::endl;
+	}
 
 	for (const SceneNode * node : root.children) {
+
+		if(firstRun) {
+			std::cout << *node << std::endl;
+		}
+
+		// TODO: Why doesn't this render any of the obejcts in a3mark.lua?
 
 		if (node->m_nodeType != NodeType::GeometryNode)
 			continue;
@@ -413,7 +427,6 @@ void A3::renderSceneGraph(const SceneNode & root) {
 		const GeometryNode * geometryNode = static_cast<const GeometryNode *>(node);
 
 		updateShaderUniforms(m_shader, *geometryNode, m_view);
-
 
 		// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
 		BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
@@ -423,6 +436,8 @@ void A3::renderSceneGraph(const SceneNode & root) {
 		glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
 		m_shader.disable();
 	}
+
+	firstRun = false;
 
 	glBindVertexArray(0);
 	CHECK_GL_ERRORS;
@@ -552,4 +567,22 @@ bool A3::keyInputEvent (
 	// Fill in with event handling code...
 
 	return eventHandled;
+}
+//----------------------------------------------------------------------------------------
+void A3::MatrixStack::push(const mat4 &m)
+{
+	matrices.push(m);
+	active_transform = active_transform*m;
+}
+
+//----------------------------------------------------------------------------------------
+void A3::MatrixStack::pop()
+{
+	mat4 m_inverse = glm::inverse(matrices.top());
+
+	// 'Undo' the matrix by right multiplying the active transform by the inverse
+	active_transform = active_transform * m_inverse;
+
+	// We don't need it anymore
+	matrices.pop();
 }

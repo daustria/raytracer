@@ -20,11 +20,11 @@ s1:scale(0.1, 2.0, 0.1)
 s1:set_material(red)
 
 s2 = gr.mesh('sphere','s2')
-rootnode:add_child(s2)
 s2:scale(0.1, 2.0, 0.1)
 s2:rotate('z', -90.0)
 s2:translate(2.0, -2.0, 0.0)
 s2:set_material(blue)
+rootnode:add_child(s2)
 
 s3 = gr.mesh('sphere','s3')
 rootnode:add_child(s3)
@@ -32,6 +32,8 @@ s3:scale(0.1, 0.1, 2.0)
 s3:translate(0.0, -2.0, 2.0)
 s3:set_material(green)
 
+-- This is the part of the code that makes this rely on hierarchical transformations, so that this script does not run on
+-- the skeleton code 
 rootnode:translate(-2.75, 0.0, -10.0)
 
 return rootnode

@@ -8,6 +8,7 @@
 #include "SceneNode.hpp"
 
 #include <glm/glm.hpp>
+#include <stack>
 #include <memory>
 
 struct LightSource {
@@ -15,13 +16,30 @@ struct LightSource {
 	glm::vec3 rgbIntensity;
 };
 
-
 class A3 : public CS488Window {
 public:
 	A3(const std::string & luaSceneFile);
 	virtual ~A3();
 
 protected:
+	// Convenience struct for handling the active transformation
+	// when walking the scene graph
+	struct MatrixStack {
+		MatrixStack() : active_transform(glm::mat4(1.0f)) {}
+
+		// Right multiplies the active transform by m. Requires
+		// that this transformation is invertible (for calling pop())
+		void push(const glm::mat4 &m); 
+
+		// Removes the most recently pushed matrix
+		void pop(); 
+
+		// Matrix representing the product of all transformations
+		// in the stack matrices
+		glm::mat4 active_transform;
+		std::stack<glm::mat4> matrices;
+	};
+
 	virtual void init() override;
 	virtual void appLogic() override;
 	virtual void guiLogic() override;
@@ -77,4 +95,7 @@ protected:
 	std::string m_luaSceneFile;
 
 	std::shared_ptr<SceneNode> m_rootNode;
+
+	MatrixStack m_matrixStack;
+
 };
