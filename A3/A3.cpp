@@ -342,19 +342,24 @@ void A3::guiLogic()
 }
 
 //----------------------------------------------------------------------------------------
-// Update mesh specific shader uniforms:
+// Update mesh specific shader uniforms.
 static void updateShaderUniforms(
 		const ShaderProgram & shader,
 		const GeometryNode & node,
 		const glm::mat4 & viewMatrix,
-		const glm::mat4 & modelMatrix 
+		const glm::mat4 & hierarchicalModelMatrix 
 ) {
 
 	shader.enable();
 	{
 		//-- Set ModelView matrix:
 		GLint location = shader.getUniformLocation("ModelView");
-		mat4 modelView = viewMatrix * modelMatrix;
+
+		// The model matrix for this geometry node will include the hierarchical matrix and the 
+		// matrix local to this node. However, we will push a special version of this node's matrix onto
+		// the hierarchical matrix stack that ignores scaling done to this node. It will be node.get_transform(),
+		// not node.get_transform_local() (the former does not include scaling and the latter does)
+		mat4 modelView = viewMatrix * hierarchicalModelMatrix * node.get_transform_local();
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
 		CHECK_GL_ERRORS;
 
@@ -413,20 +418,42 @@ void A3::renderSceneGraph(const SceneNode & root) {
 //----------------------------------------------------------------------------------------
 void A3::processNode(const SceneNode &node)
 {
-	m_matrixStack.push(node.get_transform());
-	
-	//Assume for now, that the node is a GeometryNode
-	const GeometryNode *geometryNode = static_cast<const GeometryNode *>(&node);
 
-	updateShaderUniforms(m_shader, *geometryNode, m_view, m_matrixStack.active_transform);
-	
-	// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
-	BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
+	switch(node.m_nodeType)
+	{
+		case NodeType::GeometryNode:
+		{
+			// Render the mesh and material associated with the node
+			const GeometryNode *geometryNode = static_cast<const GeometryNode *>(&node);
 
-	//-- Now render the mesh:
-	m_shader.enable();
-	glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
-	m_shader.disable();
+
+			updateShaderUniforms(m_shader, *geometryNode, m_view, m_matrixStack.active_transform);
+
+			// For geometry node, get_transform() returns the local transform at the node but with scaling not included.
+			// The matrix containing this node's transformations including the scaling is in GeometryNode::get_transform_local()
+			m_matrixStack.push(geometryNode->get_transform());
+			
+			// Get the BatchInfo corresponding to the GeometryNode's unique MeshId.
+			BatchInfo batchInfo = m_batchInfoMap[geometryNode->meshId];
+
+			//-- Now render the mesh:
+			m_shader.enable();
+			glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
+			m_shader.disable();
+			break;
+		}
+		case NodeType::JointNode:
+			// For the Joint and Scene node, we do nothing but push the local transform
+			m_matrixStack.push(node.get_transform());			
+			break;
+		case NodeType::SceneNode:
+			m_matrixStack.push(node.get_transform());
+			break;
+		default:
+			//We should never be here since there are only three node types
+			printf("Default case reached, aborting");
+			abort();
+	}	
 
 	// After rendering the node we process all its children
 	// (make a copy first so we can safely modify the list in the mutual recursion)
@@ -441,7 +468,6 @@ void A3::processNode(const SceneNode &node)
 void A3::processNodeList(std::list<SceneNode *> &nodes)
 {
 	if(nodes.empty()) {
-		// bail out
 		return;
 	} 
 
