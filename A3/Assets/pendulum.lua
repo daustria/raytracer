@@ -18,7 +18,6 @@ second:scale(0.5,2.5,0.5)
 -- After the scale, the top point of the pendulum is at (0.25, 1.25, 0.25)
 -- We translate so that the top of the pendulum is at the origin in model coordinates
 second:translate(0,-1.25,0) --Question: should we be pass translations down in geometry nodes?? 
---This may make it harder to model
 
 -------------------------------------------------------------------------------------------
 -- We use intermediate nodes for the relationship between the first pendulum and the second
@@ -42,7 +41,7 @@ third:translate(0,-1.5,0)
 -- Intermediate nodes for second to third pendulum
 third_t = gr.node('third-translation')
 --Before rotations, bottom of second pendulum is at (0.25,-2.25,0.25). So we translate down there
-third_t:translate(0, -0.75, 0)
+third_t:translate(0, -2, 0)
 
 third_joint_t = gr.node('second-third-joint', {0,0,90}, {0,0,90})
 third_t:add_child(third_joint_t)

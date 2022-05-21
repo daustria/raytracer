@@ -46,7 +46,7 @@ void GeometryNode::rotate(char axis, float angle)
 void GeometryNode::translate(const glm::vec3& amount) 
 {
 	glm::mat4 translation = glm::translate(amount);
-	trans = translation * trans;
+	// trans = translation * trans;
 	trans_local = translation * trans_local;
 }
 

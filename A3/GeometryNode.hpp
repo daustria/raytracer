@@ -18,6 +18,7 @@ public:
 	// same as scene node scale, but we dont push it onto the stack, only keep the scale local.
 	virtual void scale(const glm::vec3& amount) override;
 	virtual void rotate(char axis, float angle) override;
+	// same as scene node translate, but we dont push it onto the stack, only keep the scale local.
 	virtual void translate(const glm::vec3& amount) override;
 
 	const glm::mat4 &get_transform_local() const;
