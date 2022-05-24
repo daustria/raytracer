@@ -19,6 +19,10 @@ struct LightSource {
 
 class A3 : public CS488Window {
 public:
+	// Position Mode : Rotate and translate puppet
+	// Joint Mode : Select joints and rotate the selected ones
+	enum class InteractionMode { Position = 0, Joint };
+
 	A3(const std::string & luaSceneFile);
 	virtual ~A3();
 
@@ -69,9 +73,9 @@ protected:
 
 	void initPerspectiveMatrix();
 	void uploadCommonSceneUniforms();
-	void renderSceneGraph(const SceneNode &root);
+	void renderSceneGraph(SceneNode &root);
 
-	void processNode(const SceneNode &node);
+	void processNode(SceneNode &node);
 	void processNodeList(std::list<SceneNode *> &nodes);
 
 	void renderArcCircle();
@@ -106,6 +110,20 @@ protected:
 
 	MatrixStack m_matrixStack;
 
+	InteractionMode m_mode = InteractionMode::Position;
+
 	bool m_doPicking; 
-	std::map<unsigned int, bool> m_selected;
+	std::map<unsigned int, bool> m_selected; // Stores whether a node ID is selected in picking mode
+
+	// Stores whether a GLFW key is being held
+	std::map<int, bool> m_keyHeld;
+
+	// Track position of cursor for rotating and translating the puppet
+	glm::vec2 m_mouse{0,0};
+
+	// Keep track of how much to translate the puppet, based on mouse movements
+	glm::vec3 m_rootTranslation{0,0,0}; 
+
+	// Degrees to rotate joints on the x and y axis respectively, based on mouse movements
+	glm::vec2 m_jointRotation{0,0};
 };

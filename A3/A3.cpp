@@ -17,6 +17,10 @@ using namespace glm;
 
 static bool show_gui = true;
 
+// There's only two modes so i won't bother making an enum . global variables will do.
+static bool position_mode = true;
+static bool joint_mode = false;
+
 const size_t CIRCLE_PTS = 48;
 
 //----------------------------------------------------------------------------------------
@@ -32,6 +36,32 @@ A3::A3(const std::string & luaSceneFile)
 	  m_vbo_arcCircle(0),
 	  m_doPicking(false)
 {
+	//Stores all the keys we use in the program, and whether they are
+	//held or not 
+	m_keyHeld = {
+		// Application Menu
+		{GLFW_KEY_I, 0},
+		{GLFW_KEY_O, 0},
+		{GLFW_KEY_S, 0},
+		{GLFW_KEY_A, 0},
+		{GLFW_KEY_Q, 0},
+		// Edit Menu
+		{GLFW_KEY_U, 0},
+		{GLFW_KEY_R, 0},
+		// Options Menu
+		{GLFW_KEY_C, 0},
+		{GLFW_KEY_Z, 0},
+		{GLFW_KEY_B, 0},
+		{GLFW_KEY_F, 0},
+		// Interaction Modes
+		{GLFW_KEY_P, 0}, // Position Mode (translate and rotate the puppet)
+		{GLFW_KEY_J, 0}, // Joint Mode (rotate the selected joints)
+		{GLFW_KEY_M, 0}, // Hide/Toggle Menu
+		// Mouse Buttons
+		{GLFW_MOUSE_BUTTON_LEFT, 0},
+		{GLFW_MOUSE_BUTTON_RIGHT, 0},
+		{GLFW_MOUSE_BUTTON_MIDDLE, 0} 
+	};
 
 }
 
@@ -308,8 +338,13 @@ void A3::uploadCommonSceneUniforms() {
 void A3::appLogic()
 {
 	// Place per frame, application logic here ...
-
 	uploadCommonSceneUniforms();
+
+	// Translate the root node based on mouse movements
+	m_rootNode->translate(m_rootTranslation);
+	m_rootTranslation = {0,0,0}; // Reset the translation
+	// TODO: Make it so that we can reset to the inital translation. This can be done by keeping track of all translations 
+	// and then applying the inverse translation. Or storing all offset translations in another node, near the root node or separately from the tree
 }
 
 //----------------------------------------------------------------------------------------
@@ -345,6 +380,7 @@ void A3::guiLogic()
 		}
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
+		ImGui::Text( "Interaction Mode: %s", m_mode == InteractionMode::Position ? "Position" : "Joint"); // This assumes there are only two interaction modes
 
 	ImGui::End();
 }
@@ -421,7 +457,11 @@ static void updateShaderUniforms(
 void A3::draw() {
 
 	glEnable( GL_DEPTH_TEST );
+	glEnable( GL_CULL_FACE );
+
 	renderSceneGraph(*m_rootNode);
+	// Reset the joint node rotations
+	m_jointRotation = {0,0};
 
 
 	glDisable( GL_DEPTH_TEST );
@@ -429,7 +469,7 @@ void A3::draw() {
 }
 
 //----------------------------------------------------------------------------------------
-void A3::renderSceneGraph(const SceneNode & root) {
+void A3::renderSceneGraph(SceneNode & root) {
 
 	// Bind the VAO once here, and reuse for all GeometryNode rendering
 	glBindVertexArray(m_vao_meshData);
@@ -450,9 +490,8 @@ void A3::renderSceneGraph(const SceneNode & root) {
 }
 
 //----------------------------------------------------------------------------------------
-void A3::processNode(const SceneNode &node)
+void A3::processNode(SceneNode &node)
 {
-
 	switch(node.m_nodeType)
 	{
 		case NodeType::GeometryNode:
@@ -479,10 +518,34 @@ void A3::processNode(const SceneNode &node)
 			break;
 		}
 		case NodeType::JointNode:
-			// For the Joint and Scene node, we do nothing but push the local transform
+			// For the Joint node, if the corresponding geometry node(s) is selected, 
+			// we rotate it along the x,y axes based on the recent mouse movement on the screen. 
+
+			// This assumes that joint nodes have the corresponding geometry nodes as direct children,
+			// or that selected geometry nodes have joint nodes as their direct parent
+
+			// First we look for child nodes that are selected geometry nodes, 
+
+			for (const SceneNode * child : node.children) {
+				if (child->m_nodeType == NodeType::GeometryNode) {
+
+					if (m_selected.count(child->m_nodeId) == 0) {
+						m_selected[child->m_nodeId] = 0;
+					} else if (m_selected[child->m_nodeId]) {
+						// Our child is a selected geometry node, so we rotate ourself (a joint node)
+						// which will in turn be passed down to our child geometry node
+						node.rotate('x', m_jointRotation.x);
+						node.rotate('y', m_jointRotation.y);
+					}
+
+				}
+			}
+
+			// Also don't forget to pass the node's transform along the tree
 			m_matrixStack.push(node.get_transform());			
 			break;
 		case NodeType::SceneNode:
+			// For the Scene node, we do nothing but push the local transform
 			m_matrixStack.push(node.get_transform());
 			break;
 		default:
@@ -569,8 +632,55 @@ bool A3::mouseMoveEvent (
 ) {
 	bool eventHandled(false);
 
-	// Fill in with event handling code...
+	static const double scale_factor(10.0);
 
+	switch(m_mode)
+	{
+		case InteractionMode::Position:
+			if (m_keyHeld[GLFW_MOUSE_BUTTON_LEFT]) {
+
+				// Translate puppet in the xy plane according to mouse's xy offset
+				double offset_x = xPos - m_mouse.x;
+				double offset_y = m_mouse.y - yPos;
+
+				// Translate the root node based on the offsets
+				m_rootTranslation.x = offset_x / scale_factor;
+				m_rootTranslation.y = offset_y / scale_factor;
+
+				eventHandled = true;
+			}
+
+			if (m_keyHeld[GLFW_MOUSE_BUTTON_MIDDLE]) {
+				// Translate puppet in the z-axis according to the mouse's x offset
+				double offset = xPos - m_mouse.x;
+
+				m_rootTranslation.z = offset / scale_factor;
+
+				eventHandled = true;
+			}
+			break;
+		case InteractionMode::Joint:
+
+			if (m_keyHeld[GLFW_MOUSE_BUTTON_MIDDLE]) {
+				double offset_x = xPos - m_mouse.x;
+				double offset_y = m_mouse.y - yPos;
+
+				m_jointRotation.x = offset_x;
+				m_jointRotation.y = offset_y;
+
+				eventHandled = true;
+			}
+			break;
+		default:
+			printf("%s | Error: Default case reached\n", __func__);
+			abort();
+	}
+
+	// Reset the mouse coordinates to last known screen coordinates for the next mouse move event
+	m_mouse = {xPos, yPos};
+
+	// Fill in with event handling code...
+	
 	return eventHandled;
 }
 
@@ -586,57 +696,75 @@ bool A3::mouseButtonInputEvent (
 	bool eventHandled(false);
 
 	// Fill in with event handling code...
-
-	if (button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_PRESS) {
-		m_doPicking = true;
-
-                double xpos, ypos;
-
-		// Note: m_window is a member of CS488Window which we inherited from
-                glfwGetCursorPos( m_window, &xpos, &ypos );
-
-                uploadCommonSceneUniforms();
-
-		// Make the background white, and also clear buffers (hopefully no node ID maps to a white background)
-		glClearColor(0.85, 0.85, 0.85, 1.0);
-                glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-                // glClearColor(0.35, 0.35, 0.35, 1.0); Do we need this?
-
-		draw(); // Draw the scene again with our new false colours and white background
-
-		// I don't know if we need these are necesesary
-		// glFlush();
-		// glFinish();
-
-		// The adjustment of the mouse coordinates are from sample code. I am not sure why the relative measurement of
-		// ypos is necessary. Also the frameBuffer coordinates may be different from the window coordinates, and we adjust so that
-		// our xpos and ypos are in framebuffer coordinates
-
-                xpos *= double(m_framebufferWidth) / double(m_windowWidth);
-                ypos = m_windowHeight - ypos;
-                ypos *= double(m_framebufferHeight) / double(m_windowHeight);uploadCommonSceneUniforms();                
-
-		// I am not sure why, but the sample code is set up so that we read the colour from the back buffer. I think it has to do with not
-		// wanting the false colours to actually show up on the screen ? 
-		glReadBuffer( GL_BACK );
-		GLubyte buffer[4] = {0,0,0,0};
-                // Actually read the pixel at the mouse location.
-                glReadPixels( int(xpos), int(ypos), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
-                CHECK_GL_ERRORS;
-
-		// Reassemble the node ID
-		unsigned int node_id = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
-
-		m_doPicking = false;
-
-		// Check if node_id is in the selected map. If it is, switch the boolean flag. otherwise
-		// we put it in and initialize it to 1 since it was selected
-		if (m_selected.count(node_id) > 0) {
-			m_selected[node_id] = !m_selected[node_id];
-		} else {
-			m_selected[node_id] = 1;
-		}
 	
+	// Picking code --------------------------------------------------------
+	if (m_mode == InteractionMode::Joint) {
+		if (button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_PRESS) {
+			m_doPicking = true;
+
+			double xpos, ypos;
+
+			// Note: m_window is a member of CS488Window which we inherited from
+			glfwGetCursorPos( m_window, &xpos, &ypos );
+
+			uploadCommonSceneUniforms();
+
+			// Make the background white, and also clear buffers (hopefully no node ID maps to a white background)
+			glClearColor(0.85, 0.85, 0.85, 1.0);
+			glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+			// glClearColor(0.35, 0.35, 0.35, 1.0); Do we need this?
+
+			draw(); // Draw the scene again with our new false colours and white background
+
+			// I don't know if we need these are necesesary
+			// glFlush();
+			// glFinish();
+
+			// The adjustment of the mouse coordinates are from sample code. I am not sure why the relative measurement of
+			// ypos is necessary. Also the frameBuffer coordinates may be different from the window coordinates, and we adjust so that
+			// our xpos and ypos are in framebuffer coordinates
+
+			xpos *= double(m_framebufferWidth) / double(m_windowWidth);
+			ypos = m_windowHeight - ypos;
+			ypos *= double(m_framebufferHeight) / double(m_windowHeight);uploadCommonSceneUniforms();                
+
+			// I am not sure why, but the sample code is set up so that we read the colour from the back buffer. I think it has to do with not
+			// wanting the false colours to actually show up on the screen ? 
+			glReadBuffer( GL_BACK );
+			GLubyte buffer[4] = {0,0,0,0};
+			// Actually read the pixel at the mouse location.
+			glReadPixels( int(xpos), int(ypos), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
+			CHECK_GL_ERRORS;
+
+			// Reassemble the node ID
+			unsigned int node_id = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
+
+			m_doPicking = false;
+
+			// Check if node_id is in the selected map. If it is, switch the boolean flag. otherwise
+			// we put it in and initialize it to 1 since it was selected
+			if (m_selected.count(node_id) > 0) {
+				m_selected[node_id] = !m_selected[node_id];
+			} else {
+				m_selected[node_id] = 1;
+			}	
+
+			eventHandled = true;
+		}
+	}
+
+
+	if (m_keyHeld.count(button) > 0) {	
+
+		if (actions == GLFW_PRESS) {
+			m_keyHeld[button] = true;
+		} 
+
+		if (actions == GLFW_RELEASE) {
+			m_keyHeld[button] = false;
+		} 
+
+		eventHandled = true;
 	}
 
 	return eventHandled;
@@ -686,8 +814,19 @@ bool A3::keyInputEvent (
 			show_gui = !show_gui;
 			eventHandled = true;
 		}
+
+		if( key == GLFW_KEY_P ) {
+			m_mode = InteractionMode::Position;
+			eventHandled = true;
+		}
+
+		if( key == GLFW_KEY_J ) {
+			m_mode = InteractionMode::Joint;
+			eventHandled = true;
+		}
 	}
-	// Fill in with event handling code...
+
+	// Fill in with event handling code...	
 
 	return eventHandled;
 }

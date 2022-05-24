@@ -26,7 +26,7 @@ second_t = gr.node('second-translation')
 -- translation for the second pendulum, so that the top of first pendulum is at the bottom of the first
 second_t:translate(0, -1, 0)
 
-second_joint_t = gr.node('first-second', {0,0,90}, {0,0,90})
+second_joint_t = gr.joint('first-second', {-90,0,90}, {-90,0,90})
 --second_joint_t:rotate('z', 45)
 second_t:add_child(second_joint_t)
 -------------------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ third_t = gr.node('third-translation')
 --Before rotations, bottom of second pendulum is at (0.25,-2.25,0.25). So we translate down there
 third_t:translate(0, -2, 0)
 
-third_joint_t = gr.node('second-third-joint', {0,0,90}, {0,0,90})
+third_joint_t = gr.joint('second-third-joint', {-90, 0, 90}, {-90, 0, 90})
 third_t:add_child(third_joint_t)
 
 -------------------------------------------------------------------------------------------
