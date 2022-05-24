@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 #include <stack>
 #include <memory>
+#include <map>
 
 struct LightSource {
 	glm::vec3 position;
@@ -105,4 +106,6 @@ protected:
 
 	MatrixStack m_matrixStack;
 
+	bool m_doPicking; 
+	std::map<unsigned int, bool> m_selected;
 };

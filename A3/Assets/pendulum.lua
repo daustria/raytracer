@@ -9,6 +9,7 @@ green = gr.material({0.0, 1.0, 0.0}, {0.1, 0.1, 0.1}, 10)
 first = gr.mesh('cube', 'first')
 first:set_material(red)
 first:scale(0.5, 2.5, 0.5)
+first:rotate('y', 45)
 
 -------------------------------------------------------------------------------------------
 --Geometry for second pendulum

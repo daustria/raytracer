@@ -29,7 +29,8 @@ A3::A3(const std::string & luaSceneFile)
 	  m_vbo_vertexPositions(0),
 	  m_vbo_vertexNormals(0),
 	  m_vao_arcCircle(0),
-	  m_vbo_arcCircle(0)
+	  m_vbo_arcCircle(0),
+	  m_doPicking(false)
 {
 
 }
@@ -272,6 +273,12 @@ void A3::uploadCommonSceneUniforms() {
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(m_perpsective));
 		CHECK_GL_ERRORS;
 
+		location = m_shader.getUniformLocation("picking"); 
+
+		if (location != -1) {
+			glUniform1i(location, m_doPicking ? 1 : 0);
+
+		}
 
 		//-- Set LightSource uniform for the scene:
 		{
@@ -289,6 +296,7 @@ void A3::uploadCommonSceneUniforms() {
 			glUniform3fv(location, 1, value_ptr(ambientIntensity));
 			CHECK_GL_ERRORS;
 		}
+
 	}
 	m_shader.disable();
 }
@@ -347,7 +355,9 @@ static void updateShaderUniforms(
 		const ShaderProgram & shader,
 		const GeometryNode & node,
 		const glm::mat4 & viewMatrix,
-		const glm::mat4 & hierarchicalModelMatrix 
+		const glm::mat4 & hierarchicalModelMatrix,
+		bool do_picking,
+		bool is_selected
 ) {
 
 	shader.enable();
@@ -363,16 +373,40 @@ static void updateShaderUniforms(
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
 		CHECK_GL_ERRORS;
 
+		if (do_picking) {
+			// get the mesh ID of the node
+			const unsigned int node_id = node.m_nodeId;
+
+			// compute the false colour of this node, to be used for picking
+			float r = float(node_id & 0xff) / 255.0f; // red value corresponds to the first 8 bits of the id
+			float g = float((node_id>>8) & 0xff) / 255.0f; // green value is the next 8 bits
+			float b = float((node_id>>16) & 0xff) / 255.0f; // ... and the blue value is the next 8 bits after that
+
+			location = shader.getUniformLocation("pickingColour");
+
+			if (location != -1) {
+				glUniform3f( location, r, g, b ); // now upload the colour
+			}
+		}
+
+		// Question: Should we still do this if we are doing picking?? I'll try disabling this later when the m_doPicking flag is set
+
 		//-- Set NormMatrix:
 		location = shader.getUniformLocation("NormalMatrix");
 		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(modelView)));
 		glUniformMatrix3fv(location, 1, GL_FALSE, value_ptr(normalMatrix));
 		CHECK_GL_ERRORS;
 
-
 		//-- Set Material values:
 		location = shader.getUniformLocation("material.kd");
-		vec3 kd = node.material.kd;
+		vec3 kd;
+
+		if (is_selected) {
+			kd = vec3(1.0f, 1.0f, 0);
+		} else {
+			kd = node.material.kd;
+		}
+
 		glUniform3fv(location, 1, value_ptr(kd));
 		CHECK_GL_ERRORS;
 	}
@@ -426,8 +460,9 @@ void A3::processNode(const SceneNode &node)
 			// Render the mesh and material associated with the node
 			const GeometryNode *geometryNode = static_cast<const GeometryNode *>(&node);
 
+			bool selected = m_selected[node.m_nodeId];
 
-			updateShaderUniforms(m_shader, *geometryNode, m_view, m_matrixStack.active_transform);
+			updateShaderUniforms(m_shader, *geometryNode, m_view, m_matrixStack.active_transform, m_doPicking, selected);
 
 			// For geometry node, get_transform() returns the local transform at the node but with scaling not included.
 			// The matrix containing this node's transformations including the scaling is in GeometryNode::get_transform_local()
@@ -440,6 +475,7 @@ void A3::processNode(const SceneNode &node)
 			m_shader.enable();
 			glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
 			m_shader.disable();
+
 			break;
 		}
 		case NodeType::JointNode:
@@ -550,6 +586,58 @@ bool A3::mouseButtonInputEvent (
 	bool eventHandled(false);
 
 	// Fill in with event handling code...
+
+	if (button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_PRESS) {
+		m_doPicking = true;
+
+                double xpos, ypos;
+
+		// Note: m_window is a member of CS488Window which we inherited from
+                glfwGetCursorPos( m_window, &xpos, &ypos );
+
+                uploadCommonSceneUniforms();
+
+		// Make the background white, and also clear buffers (hopefully no node ID maps to a white background)
+		glClearColor(0.85, 0.85, 0.85, 1.0);
+                glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+                // glClearColor(0.35, 0.35, 0.35, 1.0); Do we need this?
+
+		draw(); // Draw the scene again with our new false colours and white background
+
+		// I don't know if we need these are necesesary
+		// glFlush();
+		// glFinish();
+
+		// The adjustment of the mouse coordinates are from sample code. I am not sure why the relative measurement of
+		// ypos is necessary. Also the frameBuffer coordinates may be different from the window coordinates, and we adjust so that
+		// our xpos and ypos are in framebuffer coordinates
+
+                xpos *= double(m_framebufferWidth) / double(m_windowWidth);
+                ypos = m_windowHeight - ypos;
+                ypos *= double(m_framebufferHeight) / double(m_windowHeight);uploadCommonSceneUniforms();                
+
+		// I am not sure why, but the sample code is set up so that we read the colour from the back buffer. I think it has to do with not
+		// wanting the false colours to actually show up on the screen ? 
+		glReadBuffer( GL_BACK );
+		GLubyte buffer[4] = {0,0,0,0};
+                // Actually read the pixel at the mouse location.
+                glReadPixels( int(xpos), int(ypos), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
+                CHECK_GL_ERRORS;
+
+		// Reassemble the node ID
+		unsigned int node_id = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
+
+		m_doPicking = false;
+
+		// Check if node_id is in the selected map. If it is, switch the boolean flag. otherwise
+		// we put it in and initialize it to 1 since it was selected
+		if (m_selected.count(node_id) > 0) {
+			m_selected[node_id] = !m_selected[node_id];
+		} else {
+			m_selected[node_id] = 1;
+		}
+	
+	}
 
 	return eventHandled;
 }
