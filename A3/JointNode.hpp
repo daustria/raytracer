@@ -17,5 +17,13 @@ public:
 	};
 
 	JointRange m_joint_x, m_joint_y;
-private:
+
+	// Keep track of total rotations in the x and y axis, so that 
+	// we can choose to not rotate when the total rotations exceed
+	// the bounds of JointRange
+private:	
+	double m_total_rotations_x; 
+	double m_total_rotations_y; 
+
+	void update_total_rotations(char axis, double angle);
 };

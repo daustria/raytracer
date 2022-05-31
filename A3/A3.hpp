@@ -6,6 +6,7 @@
 #include "cs488-framework/MeshConsolidator.hpp"
 
 #include "SceneNode.hpp"
+#include "GeometryNode.hpp"
 
 #include <glm/glm.hpp>
 #include <stack>
@@ -70,15 +71,19 @@ protected:
 	void mapVboDataToVertexShaderInputLocations();
 	void initViewMatrix();
 	void initLightSources();
-
 	void initPerspectiveMatrix();
+
+	void updateViewMatrix();
 	void uploadCommonSceneUniforms();
+	void updateShaderUniformsNode(const GeometryNode & node, bool is_selected);
 	void renderSceneGraph(SceneNode &root);
 
 	void processNode(SceneNode &node);
 	void processNodeList(std::list<SceneNode *> &nodes);
 
 	void renderArcCircle();
+
+	glm::vec3 computeTrackballPosition(double xPos, double yPos);
 
 	glm::mat4 m_perpsective;
 	glm::mat4 m_view;
@@ -123,6 +128,13 @@ protected:
 
 	// Keep track of how much to translate the puppet, based on mouse movements
 	glm::vec3 m_rootTranslation{0,0,0}; 
+
+	// Parameters for trackball rotation
+	float m_trackballRotationAngle = 0; // in radians
+	glm::vec3 m_trackballRotationAxis;
+	bool m_doTrackballRotation = false;
+	glm::vec3 m_trackballPosition; // The point on the trackball corresponding to the mouse coordinates
+
 
 	// Degrees to rotate joints on the x and y axis respectively, based on mouse movements
 	glm::vec2 m_jointRotation{0,0};

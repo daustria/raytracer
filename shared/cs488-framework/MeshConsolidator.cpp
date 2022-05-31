@@ -41,17 +41,23 @@ MeshConsolidator::MeshConsolidator(
 	MeshId meshId;
 	vector<vec3> positions;
 	vector<vec3> normals;
+	vector<vec3> uvCoords;
 	BatchInfo batchInfo;
 	unsigned long indexOffset(0);
 
     for(const ObjFilePath & objFile : objFileList) {
-	    ObjFileDecoder::decode(objFile.c_str(), meshId, positions, normals);
+	    ObjFileDecoder::decode(objFile.c_str(), meshId, positions, normals, uvCoords);
 
 	    uint numIndices = positions.size();
 
 	    if (numIndices != normals.size()) {
 		    throw Exception("Error within MeshConsolidator: "
 					"positions.size() != normals.size()\n");
+	    }
+
+	    if (numIndices != uvCoords.size()) {
+		    throw Exception("Error within MeshConsolidator: "
+					"positions.size() != uvCoords.size()\n");
 	    }
 
 	    batchInfo.startIndex = indexOffset;
@@ -61,6 +67,7 @@ MeshConsolidator::MeshConsolidator(
 
 	    appendVector(m_vertexPositionData, positions);
 	    appendVector(m_vertexNormalData, normals);
+	    appendVector(m_uvCoordsData, uvCoords);
 
 	    indexOffset += numIndices;
     }

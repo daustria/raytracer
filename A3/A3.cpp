@@ -34,7 +34,9 @@ A3::A3(const std::string & luaSceneFile)
 	  m_vbo_vertexNormals(0),
 	  m_vao_arcCircle(0),
 	  m_vbo_arcCircle(0),
-	  m_doPicking(false)
+	  m_doPicking(false),
+	  m_trackballRotationAngle(0),
+	  m_trackballRotationAxis(1.0f,0,0)
 {
 	//Stores all the keys we use in the program, and whether they are
 	//held or not 
@@ -96,7 +98,8 @@ void A3::init()
 	unique_ptr<MeshConsolidator> meshConsolidator (new MeshConsolidator{
 			getAssetFilePath("cube.obj"),
 			getAssetFilePath("sphere.obj"),
-			getAssetFilePath("suzanne.obj")
+			getAssetFilePath("suzanne.obj"),
+			getAssetFilePath("head.obj")
 	});
 
 
@@ -227,6 +230,8 @@ void A3::uploadVertexDataToVbos (
 			pts[2*idx+1] = sin( ang );
 		}
 
+		// Note: the circle defined corresponds to a sphere of radius 1, centered in the screen
+
 		glBufferData(GL_ARRAY_BUFFER, 2*CIRCLE_PTS*sizeof(float), pts, GL_STATIC_DRAW);
 
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -281,9 +286,14 @@ void A3::initPerspectiveMatrix()
 
 //----------------------------------------------------------------------------------------
 void A3::initViewMatrix() {
-	m_view = glm::lookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f),
-			vec3(0.0f, 1.0f, 0.0f));
+
+	vec3 eye{0,0,0};
+	vec3 gaze{0,0,-1.0f};
+	vec3 up{0,1.0f,0};
+
+	m_view = glm::lookAt(eye, gaze, up);			
 }
+
 
 //----------------------------------------------------------------------------------------
 void A3::initLightSources() {
@@ -328,8 +338,7 @@ void A3::uploadCommonSceneUniforms() {
 		}
 
 	}
-	m_shader.disable();
-}
+	m_shader.disable(); }
 
 //----------------------------------------------------------------------------------------
 /*
@@ -340,11 +349,11 @@ void A3::appLogic()
 	// Place per frame, application logic here ...
 	uploadCommonSceneUniforms();
 
-	// Translate the root node based on mouse movements
+	// Translate the root node based on mouse movement
 	m_rootNode->translate(m_rootTranslation);
 	m_rootTranslation = {0,0,0}; // Reset the translation
-	// TODO: Make it so that we can reset to the inital translation. This can be done by keeping track of all translations 
-	// and then applying the inverse translation. Or storing all offset translations in another node, near the root node or separately from the tree
+
+	// TODO: Make it so that we can reset to the inital translation. 
 }
 
 //----------------------------------------------------------------------------------------
@@ -381,35 +390,38 @@ void A3::guiLogic()
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 		ImGui::Text( "Interaction Mode: %s", m_mode == InteractionMode::Position ? "Position" : "Joint"); // This assumes there are only two interaction modes
+		ImGui::Text( "Mouse Coordinates: (%f,%f)", m_mouse.x, m_mouse.y);
+		ImGui::Text( "Trackball Position: (%f,%f,%f)", m_trackballPosition.x, m_trackballPosition.y, m_trackballPosition.z);
 
 	ImGui::End();
 }
 
 //----------------------------------------------------------------------------------------
-// Update mesh specific shader uniforms.
-static void updateShaderUniforms(
-		const ShaderProgram & shader,
+// Update mesh specific shader uniforms corresponding to the current node
+void A3::updateShaderUniformsNode(
 		const GeometryNode & node,
-		const glm::mat4 & viewMatrix,
-		const glm::mat4 & hierarchicalModelMatrix,
-		bool do_picking,
 		bool is_selected
 ) {
-
-	shader.enable();
+	m_shader.enable();
 	{
 		//-- Set ModelView matrix:
-		GLint location = shader.getUniformLocation("ModelView");
+		GLint location = m_shader.getUniformLocation("ModelView");
 
 		// The model matrix for this geometry node will include the hierarchical matrix and the 
 		// matrix local to this node. However, we will push a special version of this node's matrix onto
 		// the hierarchical matrix stack that ignores scaling done to this node. It will be node.get_transform(),
 		// not node.get_transform_local() (the former does not include scaling and the latter does)
-		mat4 modelView = viewMatrix * hierarchicalModelMatrix * node.get_transform_local();
+
+		// TODO investigate trackball rotation. i got the best results when right multiplying the trackball rotation matrix at the end of this matrix,
+		// but it still didn't work quite right
+		mat4 modelMatrix = m_matrixStack.active_transform * node.get_transform_local();
+
+		mat4 modelView = m_view * modelMatrix;
+
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
 		CHECK_GL_ERRORS;
 
-		if (do_picking) {
+		if (m_doPicking) {
 			// get the mesh ID of the node
 			const unsigned int node_id = node.m_nodeId;
 
@@ -418,7 +430,7 @@ static void updateShaderUniforms(
 			float g = float((node_id>>8) & 0xff) / 255.0f; // green value is the next 8 bits
 			float b = float((node_id>>16) & 0xff) / 255.0f; // ... and the blue value is the next 8 bits after that
 
-			location = shader.getUniformLocation("pickingColour");
+			location = m_shader.getUniformLocation("pickingColour");
 
 			if (location != -1) {
 				glUniform3f( location, r, g, b ); // now upload the colour
@@ -428,13 +440,13 @@ static void updateShaderUniforms(
 		// Question: Should we still do this if we are doing picking?? I'll try disabling this later when the m_doPicking flag is set
 
 		//-- Set NormMatrix:
-		location = shader.getUniformLocation("NormalMatrix");
+		location = m_shader.getUniformLocation("NormalMatrix");
 		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(modelView)));
 		glUniformMatrix3fv(location, 1, GL_FALSE, value_ptr(normalMatrix));
 		CHECK_GL_ERRORS;
 
 		//-- Set Material values:
-		location = shader.getUniformLocation("material.kd");
+		location = m_shader.getUniformLocation("material.kd");
 		vec3 kd;
 
 		if (is_selected) {
@@ -446,7 +458,7 @@ static void updateShaderUniforms(
 		glUniform3fv(location, 1, value_ptr(kd));
 		CHECK_GL_ERRORS;
 	}
-	shader.disable();
+	m_shader.disable();
 
 }
 
@@ -460,12 +472,12 @@ void A3::draw() {
 	glEnable( GL_CULL_FACE );
 
 	renderSceneGraph(*m_rootNode);
-	// Reset the joint node rotations
-	m_jointRotation = {0,0};
 
 
 	glDisable( GL_DEPTH_TEST );
-	renderArcCircle();
+
+	// TODO : If we implement the trackball properly, we should reenable this
+	// renderArcCircle();
 }
 
 //----------------------------------------------------------------------------------------
@@ -482,8 +494,13 @@ void A3::renderSceneGraph(SceneNode & root) {
 
 	firstRun = false;
 
+	// Reset some parameters for the next frame
 	//No need to push the root transform off the matrix stack, because we're going to empty it anyway
 	m_matrixStack.reset();
+
+	// Reset some parameters for the next frame
+	m_jointRotation = {0,0};
+	m_doTrackballRotation = false;
 
 	glBindVertexArray(0);
 	CHECK_GL_ERRORS;
@@ -501,7 +518,7 @@ void A3::processNode(SceneNode &node)
 
 			bool selected = m_selected[node.m_nodeId];
 
-			updateShaderUniforms(m_shader, *geometryNode, m_view, m_matrixStack.active_transform, m_doPicking, selected);
+			updateShaderUniformsNode(*geometryNode, selected);
 
 			// For geometry node, get_transform() returns the local transform at the node but with scaling not included.
 			// The matrix containing this node's transformations including the scaling is in GeometryNode::get_transform_local()
@@ -623,6 +640,30 @@ bool A3::cursorEnterWindowEvent (
 }
 
 //----------------------------------------------------------------------------------------
+// Returns the trackball position corresponding to the point (xPos, yPos) on the screen, in
+// pixel coordinates
+vec3 A3::computeTrackballPosition(double xPos, double yPos)
+{
+	// TODO: The sphere representing the trackball on the screen is centered in the middle of the screen,
+	// and the diamater is 50% of m_windowHeight. We should get the corresponding point on that sphere, not
+	// the sphere centered at (m_windowWidth/2, m_windowHeight/2) in screen coordinates, as we are doing now.
+	
+	glm::vec3 p{0,0,0};
+	p.x = (xPos/m_windowWidth)*2 - 1.0;
+	p.y = (yPos/m_windowHeight)*2 - 1.0;
+	p.y = -p.y;
+	float norm_squared = p.x*p.x + p.y*p.y;
+
+	if (norm_squared <= 1.0f) {
+		// The corresponding point we clicked on the sphere has height sqrt(1 - x^2 - y^2).
+		p.z = sqrt(1 - norm_squared); 
+	} 
+
+	p = glm::normalize(p);
+	return p;
+}
+
+//----------------------------------------------------------------------------------------
 /*
  * Event handler.  Handles mouse cursor movement events.
  */
@@ -655,6 +696,27 @@ bool A3::mouseMoveEvent (
 				double offset = xPos - m_mouse.x;
 
 				m_rootTranslation.z = offset / scale_factor;
+
+				eventHandled = true;
+			}
+			if (m_keyHeld[GLFW_MOUSE_BUTTON_RIGHT]) {
+				// Rotate the puppet about the virtual trackball 
+				
+				// First we must convert the mouse positions in screen coordinates to 
+				// coordinates in [-1,1]^2
+				glm::vec3 p = computeTrackballPosition(xPos, yPos);
+				glm::vec3 q = computeTrackballPosition(m_mouse.x, m_mouse.y);
+
+				m_trackballPosition = q;
+
+				// Compute the trackball angle and axis (some math to understand here.. best to google about
+				// trackball rotation to understand it)
+
+				m_trackballRotationAngle = acos(std::min(1.0f, glm::dot(p,q)));
+
+				m_trackballRotationAxis = glm::normalize(glm::cross(p,q));
+				
+				m_doTrackballRotation = true;
 
 				eventHandled = true;
 			}
