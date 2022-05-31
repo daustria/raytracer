@@ -41,7 +41,7 @@ MeshConsolidator::MeshConsolidator(
 	MeshId meshId;
 	vector<vec3> positions;
 	vector<vec3> normals;
-	vector<vec3> uvCoords;
+	vector<vec2> uvCoords;
 	BatchInfo batchInfo;
 	unsigned long indexOffset(0);
 
@@ -67,7 +67,7 @@ MeshConsolidator::MeshConsolidator(
 
 	    appendVector(m_vertexPositionData, positions);
 	    appendVector(m_vertexNormalData, normals);
-	    appendVector(m_uvCoordsData, uvCoords);
+	    appendVector(m_vertexTextureData, uvCoords);
 
 	    indexOffset += numIndices;
     }
@@ -92,6 +92,11 @@ const float * MeshConsolidator::getVertexPositionDataPtr() const {
 const float * MeshConsolidator::getVertexNormalDataPtr() const {
     return &(m_vertexNormalData[0].x);
 }
+//----------------------------------------------------------------------------------------
+// Returns the starting memory location for vertex texture data.
+const float * MeshConsolidator::getVertexTextureDataPtr() const {
+	return &(m_vertexTextureData[0].x);
+}
 
 //----------------------------------------------------------------------------------------
 // Returns the total number of bytes of all vertex position data.
@@ -103,4 +108,9 @@ size_t MeshConsolidator::getNumVertexPositionBytes() const {
 // Returns the total number of bytes of all vertex normal data.
 size_t MeshConsolidator::getNumVertexNormalBytes() const {
 	return m_vertexNormalData.size() * sizeof(vec3);
+}
+//----------------------------------------------------------------------------------------
+// Returns the total number of bytes of all vertex texture data.
+size_t MeshConsolidator::getNumVertexTextureBytes() const {
+	return m_vertexTextureData.size() * sizeof(vec2);
 }
