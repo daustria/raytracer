@@ -13,13 +13,12 @@ using namespace std;
 #include <glm/gtx/io.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 using namespace glm;
 
 static bool show_gui = true;
-
-// There's only two modes so i won't bother making an enum . global variables will do.
-static bool position_mode = true;
-static bool joint_mode = false;
 
 const size_t CIRCLE_PTS = 48;
 
@@ -29,6 +28,7 @@ A3::A3(const std::string & luaSceneFile)
 	: m_luaSceneFile(luaSceneFile),
 	  m_positionAttribLocation(0),
 	  m_normalAttribLocation(0),
+	  m_textureAttribLocation(0),
 	  m_vao_meshData(0),
 	  m_vbo_vertexPositions(0),
 	  m_vbo_vertexNormals(0),
@@ -65,6 +65,9 @@ A3::A3(const std::string & luaSceneFile)
 		{GLFW_MOUSE_BUTTON_MIDDLE, 0} 
 	};
 
+	// Fix this magic number later
+	m_textureData.reserve(2);
+
 }
 
 //----------------------------------------------------------------------------------------
@@ -96,10 +99,14 @@ void A3::init()
 	// positions, and normals will be extracted and stored within the MeshConsolidator
 	// class.
 	unique_ptr<MeshConsolidator> meshConsolidator (new MeshConsolidator{
+		//	getAssetFilePath("cube.obj"),
+		//	getAssetFilePath("sphere.obj"),
+		//	getAssetFilePath("suzanne.obj"),
+		//	getAssetFilePath("head.obj"),
+			getAssetFilePath("torso.obj"),
 			getAssetFilePath("cube.obj"),
 			getAssetFilePath("sphere.obj"),
-			getAssetFilePath("suzanne.obj"),
-			getAssetFilePath("head.obj")
+			getAssetFilePath("suzanne.obj")
 	});
 
 
@@ -110,6 +117,8 @@ void A3::init()
 	uploadVertexDataToVbos(*meshConsolidator);
 
 	mapVboDataToVertexShaderInputLocations();
+
+	loadTextureData();
 
 	initPerspectiveMatrix();
 
@@ -122,6 +131,43 @@ void A3::init()
 	// all vertex data resources.  This is fine since we already copied this data to
 	// VBOs on the GPU.  We have no use for storing vertex data on the CPU side beyond
 	// this point.
+}
+
+//----------------------------------------------------------------------------------------
+void A3::loadTextureData()
+{
+	// First load the texture from the provided image file
+	int width, height, nrChannels; // number of colour channels 
+
+	stbi_set_flip_vertically_on_load(true);  
+	unsigned char *data = stbi_load(getAssetFilePath("suit.png").c_str(), &width, &height, &nrChannels, 0);
+
+	// Now upload the texture data to the GPU 
+	glGenTextures(1, &m_textureData[0]);
+	glBindTexture(GL_TEXTURE_2D, m_textureData[0]); // Set this texture as the one currently active
+
+	// Texture wrapping and filtering options
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
+
+	if (data) {
+		// Actually load the texture 
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		// Load the required mipmaps for the texture
+		glGenerateMipmap(GL_TEXTURE_2D); 
+	} else {
+		printf("%s | ERROR : failed to load texture\n", __func__);
+		abort();
+	}
+
+	// We don't need this data anymore since its on the GPU 
+	stbi_image_free(data); 
+
+	// Reset to default
+	glBindTexture(GL_TEXTURE_2D, 0);
+
 }
 
 //----------------------------------------------------------------------------------------
@@ -168,6 +214,10 @@ void A3::enableVertexShaderInputSlots()
 		// Enable the vertex shader attribute location for "normal" when rendering.
 		m_normalAttribLocation = m_shader.getAttribLocation("normal");
 		glEnableVertexAttribArray(m_normalAttribLocation);
+
+		// Enable the vertex shader attribute location for "texture" when rendering.
+		m_textureAttribLocation = m_shader.getAttribLocation("texture");
+		glEnableVertexAttribArray(m_textureAttribLocation);
 
 		CHECK_GL_ERRORS;
 	}
@@ -217,6 +267,17 @@ void A3::uploadVertexDataToVbos (
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		CHECK_GL_ERRORS;
 	}
+	// Generate VBO to store all vertex texture data
+	{
+		glGenBuffers(1, &m_vbo_vertexTextures);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_vbo_vertexTextures);
+
+		glBufferData(GL_ARRAY_BUFFER, meshConsolidator.getNumVertexTextureBytes(),
+				meshConsolidator.getVertexTextureDataPtr(), GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
 
 	// Generate VBO to store the trackball circle.
 	{
@@ -254,6 +315,11 @@ void A3::mapVboDataToVertexShaderInputLocations()
 	// "normal" vertex attribute location for any bound vertex shader program.
 	glBindBuffer(GL_ARRAY_BUFFER, m_vbo_vertexNormals);
 	glVertexAttribPointer(m_normalAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+	// Tell GL how to map data from the vertex buffer "m_vbo_vertexTextures" into the
+	// "texture" vertex attribute location for any bound vertex shader program.
+	glBindBuffer(GL_ARRAY_BUFFER, m_vbo_vertexTextures);
+	glVertexAttribPointer(m_textureAttribLocation, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
 	//-- Unbind target, and restore default values:
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -419,6 +485,11 @@ void A3::updateShaderUniformsNode(
 		mat4 modelView = m_view * modelMatrix;
 
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
+
+		// Set the texture sampler
+		GLint textureSamplerLocation = m_shader.getUniformLocation("ourTexture");
+		glUniform1i(textureSamplerLocation, 0);
+
 		CHECK_GL_ERRORS;
 
 		if (m_doPicking) {
@@ -435,9 +506,9 @@ void A3::updateShaderUniformsNode(
 			if (location != -1) {
 				glUniform3f( location, r, g, b ); // now upload the colour
 			}
-		}
+		} 
 
-		// Question: Should we still do this if we are doing picking?? I'll try disabling this later when the m_doPicking flag is set
+		// Question: Should we still do this if we are doing picking? 
 
 		//-- Set NormMatrix:
 		location = m_shader.getUniformLocation("NormalMatrix");
@@ -473,7 +544,6 @@ void A3::draw() {
 
 	renderSceneGraph(*m_rootNode);
 
-
 	glDisable( GL_DEPTH_TEST );
 
 	// TODO : If we implement the trackball properly, we should reenable this
@@ -485,6 +555,10 @@ void A3::renderSceneGraph(SceneNode & root) {
 
 	// Bind the VAO once here, and reuse for all GeometryNode rendering
 	glBindVertexArray(m_vao_meshData);
+
+	// Bind the texture. Will need to edit when I have more than one texture
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_textureData[0]);
 	
 	static bool firstRun = true;
 
@@ -529,6 +603,7 @@ void A3::processNode(SceneNode &node)
 
 			//-- Now render the mesh:
 			m_shader.enable();
+
 			glDrawArrays(GL_TRIANGLES, batchInfo.startIndex, batchInfo.numIndices);
 			m_shader.disable();
 

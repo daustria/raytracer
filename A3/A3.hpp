@@ -9,6 +9,7 @@
 #include "GeometryNode.hpp"
 
 #include <glm/glm.hpp>
+#include <string>
 #include <stack>
 #include <memory>
 #include <map>
@@ -16,6 +17,12 @@
 struct LightSource {
 	glm::vec3 position;
 	glm::vec3 rgbIntensity;
+};
+
+struct Texture {
+	std::string filepath;
+	int width;
+	int height;
 };
 
 class A3 : public CS488Window {
@@ -69,6 +76,7 @@ protected:
 	void enableVertexShaderInputSlots();
 	void uploadVertexDataToVbos(const MeshConsolidator & meshConsolidator);
 	void mapVboDataToVertexShaderInputLocations();
+	void loadTextureData();
 	void initViewMatrix();
 	void initLightSources();
 	void initPerspectiveMatrix();
@@ -94,8 +102,12 @@ protected:
 	GLuint m_vao_meshData;
 	GLuint m_vbo_vertexPositions;
 	GLuint m_vbo_vertexNormals;
+	GLuint m_vbo_vertexTextures;
 	GLint m_positionAttribLocation;
 	GLint m_normalAttribLocation;
+	GLint m_textureAttribLocation;
+	std::vector<GLuint> m_textureData;
+
 	ShaderProgram m_shader;
 
 	//-- GL resources for trackball circle geometry:
@@ -134,7 +146,6 @@ protected:
 	glm::vec3 m_trackballRotationAxis;
 	bool m_doTrackballRotation = false;
 	glm::vec3 m_trackballPosition; // The point on the trackball corresponding to the mouse coordinates
-
 
 	// Degrees to rotate joints on the x and y axis respectively, based on mouse movements
 	glm::vec2 m_jointRotation{0,0};

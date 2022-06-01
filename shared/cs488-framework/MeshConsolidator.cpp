@@ -55,7 +55,7 @@ MeshConsolidator::MeshConsolidator(
 					"positions.size() != normals.size()\n");
 	    }
 
-	    if (numIndices != uvCoords.size()) {
+	    if (numIndices != uvCoords.size() && uvCoords.size() > 0) {
 		    throw Exception("Error within MeshConsolidator: "
 					"positions.size() != uvCoords.size()\n");
 	    }
