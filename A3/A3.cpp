@@ -99,11 +99,10 @@ void A3::init()
 	// positions, and normals will be extracted and stored within the MeshConsolidator
 	// class.
 	unique_ptr<MeshConsolidator> meshConsolidator (new MeshConsolidator{
-		//	getAssetFilePath("cube.obj"),
-		//	getAssetFilePath("sphere.obj"),
-		//	getAssetFilePath("suzanne.obj"),
-		//	getAssetFilePath("head.obj"),
+			// Custom meshes
+			getAssetFilePath("head.obj"),
 			getAssetFilePath("torso.obj"),
+			// Default meshes
 			getAssetFilePath("cube.obj"),
 			getAssetFilePath("sphere.obj"),
 			getAssetFilePath("suzanne.obj")
@@ -140,7 +139,7 @@ void A3::loadTextureData()
 	int width, height, nrChannels; // number of colour channels 
 
 	stbi_set_flip_vertically_on_load(true);  
-	unsigned char *data = stbi_load(getAssetFilePath("suit.png").c_str(), &width, &height, &nrChannels, 0);
+	unsigned char *data = stbi_load(getAssetFilePath("face.png").c_str(), &width, &height, &nrChannels, 0);
 
 	// Now upload the texture data to the GPU 
 	glGenTextures(1, &m_textureData[0]);
