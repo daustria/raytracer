@@ -65,8 +65,6 @@ A3::A3(const std::string & luaSceneFile)
 		{GLFW_MOUSE_BUTTON_MIDDLE, 0} 
 	};
 
-	// Fix this magic number later
-	m_textureData.reserve(2);
 
 }
 
@@ -99,9 +97,14 @@ void A3::init()
 	// positions, and normals will be extracted and stored within the MeshConsolidator
 	// class.
 	unique_ptr<MeshConsolidator> meshConsolidator (new MeshConsolidator{
-			// Custom meshes
+			// Custom meshes (textured)
 			getAssetFilePath("head.obj"),
 			getAssetFilePath("torso.obj"),
+			// Custom meshes (non-textured)
+			getAssetFilePath("upper-lwing.obj"),
+			getAssetFilePath("upper-rwing.obj"),
+			getAssetFilePath("lower-lwing.obj"),
+			getAssetFilePath("lower-rwing.obj"),
 			// Default meshes
 			getAssetFilePath("cube.obj"),
 			getAssetFilePath("sphere.obj"),
@@ -135,38 +138,46 @@ void A3::init()
 //----------------------------------------------------------------------------------------
 void A3::loadTextureData()
 {
-	// First load the texture from the provided image file
-	int width, height, nrChannels; // number of colour channels 
+	// We only have two textures to load
+	static vector<string> textures{"face.png", "suit.png"};
+	m_textureData.resize(textures.size());
 
-	stbi_set_flip_vertically_on_load(true);  
-	unsigned char *data = stbi_load(getAssetFilePath("face.png").c_str(), &width, &height, &nrChannels, 0);
+	stbi_set_flip_vertically_on_load(true);
+	int width, height, nrChannels;
 
-	// Now upload the texture data to the GPU 
-	glGenTextures(1, &m_textureData[0]);
-	glBindTexture(GL_TEXTURE_2D, m_textureData[0]); // Set this texture as the one currently active
+	for (int i = 0; i < textures.size(); ++i) 
+	{
+		// Load the texture from the png file 	
+		string filename = textures[i];
+		unsigned char *data = stbi_load(getAssetFilePath(filename.c_str()).c_str(), &width, &height, &nrChannels, 0);
 
-	// Texture wrapping and filtering options
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
+		// Now upload the texture data to the GPU 
+		glGenTextures(1, &m_textureData[i]);
+		glActiveTexture(GL_TEXTURE0 + i);
+		glBindTexture(GL_TEXTURE_2D, m_textureData[i]); // Set this texture as the one currently active
 
-	if (data) {
-		// Actually load the texture 
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-		// Load the required mipmaps for the texture
-		glGenerateMipmap(GL_TEXTURE_2D); 
-	} else {
-		printf("%s | ERROR : failed to load texture\n", __func__);
-		abort();
+		// Texture wrapping and filtering options
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
+
+		if (data) {
+			// Actually load the texture 
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+			// Load the required mipmaps for the texture
+			glGenerateMipmap(GL_TEXTURE_2D); 
+		} else {
+			printf("%s | ERROR : failed to load texture\n", __func__);
+			abort();
+		}
+
+		// We don't need this data anymore since its on the GPU now
+		stbi_image_free(data); 
 	}
-
-	// We don't need this data anymore since its on the GPU 
-	stbi_image_free(data); 
 
 	// Reset to default
 	glBindTexture(GL_TEXTURE_2D, 0);
-
 }
 
 //----------------------------------------------------------------------------------------
@@ -402,6 +413,15 @@ void A3::uploadCommonSceneUniforms() {
 			CHECK_GL_ERRORS;
 		}
 
+		//-- Set our sampler uniforms for the textures
+		{
+			location = m_shader.getUniformLocation("face"); //blathers face
+			glUniform1i(location, 0); // This sampler corresponds to GL_TEXTURE0
+			location = m_shader.getUniformLocation("suit"); //blathers torso
+			glUniform1i(location, 1); // And this sampler corresponds to GL_TEXTURE1
+		}
+		
+
 	}
 	m_shader.disable(); }
 
@@ -416,9 +436,12 @@ void A3::appLogic()
 
 	// Translate the root node based on mouse movement
 	m_rootNode->translate(m_rootTranslation);
-	m_rootTranslation = {0,0,0}; // Reset the translation
+	m_rootNode->rotate('y', m_rotation_y);
+	// Reset some parameters for next frame
+	m_rootTranslation = {0,0,0}; 
+	m_rotation_y = 0;
 
-	// TODO: Make it so that we can reset to the inital translation. 
+	// TODO: Make it so that we can reset to the inital translation and rotation
 }
 
 //----------------------------------------------------------------------------------------
@@ -485,10 +508,6 @@ void A3::updateShaderUniformsNode(
 
 		glUniformMatrix4fv(location, 1, GL_FALSE, value_ptr(modelView));
 
-		// Set the texture sampler
-		GLint textureSamplerLocation = m_shader.getUniformLocation("ourTexture");
-		glUniform1i(textureSamplerLocation, 0);
-
 		CHECK_GL_ERRORS;
 
 		if (m_doPicking) {
@@ -505,7 +524,18 @@ void A3::updateShaderUniformsNode(
 			if (location != -1) {
 				glUniform3f( location, r, g, b ); // now upload the colour
 			}
-		} 
+		} else {
+			// Not in picking mode, so decide what texture we want to use based on our mesh ID
+			location = m_shader.getUniformLocation("textureNumber");
+
+			if (node.meshId == "head") {
+				glUniform1i(location, 0);
+			} else if (node.meshId == "torso") {
+				glUniform1i(location, 1);
+			} else {
+				glUniform1i(location, -1);
+			}
+		}
 
 		// Question: Should we still do this if we are doing picking? 
 
@@ -555,10 +585,15 @@ void A3::renderSceneGraph(SceneNode & root) {
 	// Bind the VAO once here, and reuse for all GeometryNode rendering
 	glBindVertexArray(m_vao_meshData);
 
-	// Bind the texture. Will need to edit when I have more than one texture
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, m_textureData[0]);
-	
+	// Bind the textures. Will need to edit when I have more than one texture
+	for(int i = 0; i < m_textureData.size(); ++i) {
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, m_textureData[0]);	
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, m_textureData[1]);	
+	}
+
 	static bool firstRun = true;
 
 	m_matrixStack.push(root.get_transform());
@@ -774,6 +809,14 @@ bool A3::mouseMoveEvent (
 				eventHandled = true;
 			}
 			if (m_keyHeld[GLFW_MOUSE_BUTTON_RIGHT]) {
+
+				double offset = xPos - m_mouse.x;
+				m_rotation_y += offset / scale_factor;
+				eventHandled = true;
+
+				// Trackball rotation code. Rework on this if we decide to implement trackball rotation again.. 
+				// I couldn't figure out how to get it quite working though
+				/* 
 				// Rotate the puppet about the virtual trackball 
 				
 				// First we must convert the mouse positions in screen coordinates to 
@@ -793,6 +836,7 @@ bool A3::mouseMoveEvent (
 				m_doTrackballRotation = true;
 
 				eventHandled = true;
+				*/ 
 			}
 			break;
 		case InteractionMode::Joint:

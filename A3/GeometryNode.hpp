@@ -13,7 +13,7 @@ public:
 
 	// Mesh Identifier. This must correspond to an object name of
 	// a loaded .obj file.
-	std::string meshId;
+	const std::string meshId;
 
 	// same as scene node scale, but we dont push it onto the stack, only keep the scale local.
 	virtual void scale(const glm::vec3& amount) override;

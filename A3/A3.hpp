@@ -147,6 +147,9 @@ protected:
 	bool m_doTrackballRotation = false;
 	glm::vec3 m_trackballPosition; // The point on the trackball corresponding to the mouse coordinates
 
+	// paramter for y-axis rotation. Temporary, until we implement trackball rotation
+	float m_rotation_y = 0;
+
 	// Degrees to rotate joints on the x and y axis respectively, based on mouse movements
 	glm::vec2 m_jointRotation{0,0};
 };
