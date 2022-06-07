@@ -1,4 +1,4 @@
-# Blender v3.1.2 OBJ File: 'blathers-torso2.blend'
+# Blender v3.1.2 OBJ File: 'blathers-torso.blend'
 # www.blender.org
 o torso
 v 0.255649 -0.461553 -2.484559
@@ -289,3 +289,9 @@ f 36/91/57 8/99/66 6/100/67
 f 8/99/68 20/101/69 6/100/38
 f 6/100/67 7/89/55 36/91/57
 f 23/95/61 38/102/70 15/96/62
+l 39 44
+l 40 42
+l 43 44
+l 41 42
+l 43 39
+l 41 40

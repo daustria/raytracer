@@ -31,6 +31,18 @@ void JointNode::set_joint_y(double min, double init, double max) {
 	rotate('y', init);
 }
 
+//-------------------------------------------------------------------------------------
+float clamp_angle(float val, float min, float max)
+{
+	if (val > max) {
+		val = max;
+	} else if (val < min) {
+		val = min;
+	} 
+
+	return val;	
+}
+
 //--------------------------------------------------------------------------------------
 void JointNode::rotate(char axis, float angle)
 {
@@ -42,15 +54,9 @@ void JointNode::rotate(char axis, float angle)
 	{
 		case 'x':
 		{
-			// clamp the angle before doing anything 
-			if (angle > m_joint_x.max) {
-				angle = m_joint_x.max;
-			} else if (angle < m_joint_x.min) {
-				angle = m_joint_x.min;
-			} 
+			angle = clamp_angle(angle, m_joint_x.min, m_joint_x.max);
 
 			// check if this rotation is legal
-
 			float resulting_total = m_total_rotations_x + angle;
 			
 			if (resulting_total > m_joint_x.max || resulting_total < m_joint_x.min) {
@@ -58,29 +64,22 @@ void JointNode::rotate(char axis, float angle)
 				return;
 			}
 
-			m_total_rotations_x += angle;
 			rot_axis = glm::vec3(1.0f, 0, 0);
 		}
 			break;
 		case 'y':
 		{
-			// clamp the angle before rotating
-			if (angle > m_joint_y.max) {
-				angle = m_joint_y.max;
-			} else if (angle < m_joint_x.min) {
-				angle = m_joint_y.min;
-			} 
+
+			angle = clamp_angle(angle, m_joint_y.min, m_joint_y.max);
 
 			rot_axis = glm::vec3(0, 1.0f, 0);
 
 			float resulting_total = m_total_rotations_y + angle;
 			
 			if (resulting_total > m_joint_y.max || resulting_total < m_joint_y.min) {
-				// The total amount of rotations is not within the set bounds so we don't rotate
 				return;
 			}
 
-			m_total_rotations_y += angle;
 			break;
 		}
 		case 'z':
@@ -101,12 +100,12 @@ void JointNode::update_total_rotations(char axis, double angle)
 	{
 		case 'x':
 		{
-			m_total_rotations_x += angle;
+			m_total_rotations_x = clamp_angle(m_total_rotations_x + angle, m_joint_x.min, m_joint_x.max);
 			break;
 		}
 		case 'y':
 		{
-			m_total_rotations_y += angle;
+			m_total_rotations_y = clamp_angle(m_total_rotations_y + angle, m_joint_y.min, m_joint_y.max);
 			break;
 		}
 		case 'z':
@@ -117,3 +116,4 @@ void JointNode::update_total_rotations(char axis, double angle)
 	}
 
 }
+

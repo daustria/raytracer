@@ -585,22 +585,16 @@ void A3::renderSceneGraph(SceneNode & root) {
 	// Bind the VAO once here, and reuse for all GeometryNode rendering
 	glBindVertexArray(m_vao_meshData);
 
-	// Bind the textures. Will need to edit when I have more than one texture
-	for(int i = 0; i < m_textureData.size(); ++i) {
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_textureData[0]);	
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, m_textureData[1]);	
+	// Bind the textures. I only have two textures but I loop it over just in case I add more
+	for(int i = 0; i < m_textureData.size(); ++i)
+	{
+		glActiveTexture(GL_TEXTURE0+i);
+		glBindTexture(GL_TEXTURE_2D, m_textureData[i]);	
 	}
-
-	static bool firstRun = true;
 
 	m_matrixStack.push(root.get_transform());
 
 	processNode(root);
-
-	firstRun = false;
 
 	// Reset some parameters for the next frame
 	//No need to push the root transform off the matrix stack, because we're going to empty it anyway
@@ -845,8 +839,8 @@ bool A3::mouseMoveEvent (
 				double offset_x = xPos - m_mouse.x;
 				double offset_y = m_mouse.y - yPos;
 
-				m_jointRotation.x = offset_x;
-				m_jointRotation.y = offset_y;
+				m_jointRotation.x = offset_x / scale_factor;
+				m_jointRotation.y = offset_y / scale_factor;
 
 				eventHandled = true;
 			}
