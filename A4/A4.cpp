@@ -17,20 +17,27 @@ void A4_Render(
 
 		// Lighting parameters  
 		const glm::vec3 & ambient,
-		const std::list<Light *> & lights
-) {
+		const std::list<Light *> & lights)
+{
+	// Construct the orthonormal coordinate / camera frame {u,v,w} from eye,view,up
+	
+	// We choose w to be opposite the view vector, and all rays to have direction -w
+	glm::vec3 w{-1 * glm::normalize(view)};
+	glm::vec3 u{glm::normalize(glm::cross(up,w))};
+	// This chooses 'v' so that it is the closest one to 'up' that is orthogonal to w
+	glm::vec3 v{glm::cross(w,u)};
 
-  // Fill in raytracing code here...  
+	
 
-  std::cout << "Calling A4_Render(\n" <<
-		  "\t" << *root <<
-          "\t" << "Image(width:" << image.width() << ", height:" << image.height() << ")\n"
-          "\t" << "eye:  " << glm::to_string(eye) << std::endl <<
-		  "\t" << "view: " << glm::to_string(view) << std::endl <<
-		  "\t" << "up:   " << glm::to_string(up) << std::endl <<
-		  "\t" << "fovy: " << fovy << std::endl <<
-          "\t" << "ambient: " << glm::to_string(ambient) << std::endl <<
-		  "\t" << "lights{" << std::endl;
+	std::cout << "Calling A4_Render(\n" <<
+		"\t" << *root <<
+		"\t" << "Image(width:" << image.width() << ", height:" << image.height() << ")\n"
+		"\t" << "eye:  " << glm::to_string(eye) << std::endl <<
+		"\t" << "view: " << glm::to_string(view) << std::endl <<
+		"\t" << "up:   " << glm::to_string(up) << std::endl <<
+		"\t" << "fovy: " << fovy << std::endl <<
+		"\t" << "ambient: " << glm::to_string(ambient) << std::endl <<
+		"\t" << "lights{" << std::endl;
 
 	for(const Light * light : lights) {
 		std::cout << "\t\t" <<  *light << std::endl;

@@ -23,3 +23,12 @@ void A4_Render(
 		const glm::vec3 & ambient,
 		const std::list<Light *> & lights
 );
+
+
+struct Ray
+{
+	glm::vec3 o; // origin
+	glm::vec3 d; // direction
+
+	glm::vec3 evaluate(float t) const;
+};
