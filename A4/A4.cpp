@@ -1,6 +1,26 @@
 #include <glm/ext.hpp>
-
+#include <assert.h>
 #include "A4.hpp"
+#include "Ray.hpp"
+#define PLANE_WIDTH 100	
+#define PLANE_HEIGHT 100
+#define PLANE_DISTANCE 10
+
+// Implement the ray class here
+
+Ray::Ray(const glm::vec3 &origin, const glm::vec3 &direction) 
+	: o(origin), d(direction), origin(origin), direction(direction)
+{
+	static const float EPSILON_RAY = 0.1f;
+	// Want to make sure our direction is non-zero. I don't want to 
+	// worry about rays with a null direction, because that's just a point
+	assert(glm::length2(direction) > EPSILON_RAY^2);
+}
+
+glm::vec3 Ray::evaluate(float t) const
+{
+	return o + t*d;
+}
 
 void A4_Render(
 		// What to render  
@@ -22,12 +42,10 @@ void A4_Render(
 	// Construct the orthonormal coordinate / camera frame {u,v,w} from eye,view,up
 	
 	// We choose w to be opposite the view vector, and all rays to have direction -w
-	glm::vec3 w{-1 * glm::normalize(view)};
-	glm::vec3 u{glm::normalize(glm::cross(up,w))};
+	 glm::vec3 w_cam{-1 * glm::normalize(view)};
+	 glm::vec3 u_cam{glm::normalize(glm::cross(up,w_cam))};
 	// This chooses 'v' so that it is the closest one to 'up' that is orthogonal to w
-	glm::vec3 v{glm::cross(w,u)};
-
-	
+	 glm::vec3 v_cam{glm::cross(w_cam,u_cam)};
 
 	std::cout << "Calling A4_Render(\n" <<
 		"\t" << *root <<
@@ -48,8 +66,35 @@ void A4_Render(
 	size_t h = image.height();
 	size_t w = image.width();
 
+	// For now we'll assume that the root node has its children a list of
+	// surfaces we can hit
+	
+	// We'll initialize the rays in here
+	const std::list<SceneNode *> surfaces = root.children;
+
+	// First we need to define the dimensions of our image plane
+
+	static const float l(-PLANE_WIDTH/2);
+	static const float r(PLANE_WIDTH/2);
+	static const float t(PLANE_HEIGHT/2);
+	static const float b(-PLANE_HEIGHT/2);
+
 	for (uint y = 0; y < h; ++y) {
 		for (uint x = 0; x < w; ++x) {
+
+			// Our image dimensions are w by h.
+			// pixel position (i,j) in the image corresponds to the point (u,v) on the pixel plane, and
+			// we compute (u,v) as...
+
+			float u = l + ((float) (r - l)*(x + 0.5f)) / w;
+			float v = b + ((float) (t - b)*(x + 0.5f)) / h;
+
+			// We construct our rays for a perspective view. The origin and direction are taken from textbook computations
+			// (4.3 of Shirley's book)
+
+			Ray r(eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam);
+
+
 			// Red: 
 			image(x, y, 0) = (double)1.0;
 			// Green: 
