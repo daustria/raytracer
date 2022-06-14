@@ -1,4 +1,5 @@
 #include "Primitive.hpp"
+#include "polyroots.hpp"
 
 static const float epsilon = 0.01f;
 
@@ -48,69 +49,56 @@ void NonhierSphere::hit(HitRecord &hr, Ray r, float t_0, float t_1) const
 	float b = 2*glm::dot(r.d, offset);
 	float c = glm::dot(offset, offset) - m_radius * m_radius;
 
-	float discriminant = b*b - 4*a*c;
+	// Use the provided code to solve the quadratic equation
+	
+	double roots[2];	
 
-	if (discriminant < 0) {
-		// No solutions
-		hr.miss = true;
-	} else {
-		// The discriminant is non-zero so there is at least one solution.
+	size_t num_solns = quadraticRoots(a, b, c, roots);
+	float t;
 
-		float sqrt_discriminant = sqrt(discriminant);
-
-		bool outside_interval = false;
-		float t_intersection = 0;
-
-		//Discriminant close to 0, we'll say here we have one solution
-		if ( abs(discriminant) < epsilon ) {
-			// The quadratic formula has two choices, we'll take the 
-			// positive one for this case
-
-			t_intersection = (-b + sqrt_discriminant) / 2*a;
-
-			if (t_intersection > t_0 && t_intersection < t_1) {
-				// Do nothing
-			} else {
-				outside_interval = true;
+	switch(num_solns)
+	{
+		case 0:
+			hr.miss = true;
+			break;
+		case 1:
+			t = roots[1];
+			if (!(t > t_0 && t < t_1)) {
+				// The solution is outside the interval so we don't accept it
+				hr.miss = true;
 			}
 
-		} else {
-			// Discriminant is non-zero so the ray intersects the sphere twice: One where it enters
-			// and one where it leaves. We must choose the 'closer' one.
-			float soln_1 = (-b + sqrt_discriminant)/ 2*a;
-			float soln_2 = (-b - sqrt_discriminant) / 2*a;
-
-			// Find which of the solutions are smaller, and which is larger
-			float smaller = std::fmin(soln_1, soln_2);
-			float larger = std::fmax(soln_1, soln_2);
+			break;
+		case 2:
+		{
+			float smaller = std::fmin(roots[0], roots[1]);
+			float larger = std::fmax(roots[0], roots[1]);
 
 			// If the smaller of the two is in the interval (t_0, t_1), then it is the one we take.
 			// Otherwise if the larger is in the interval, we take that one. If none of them are in the interval
 			// then it counts as a miss.
 			if ( smaller > t_0 && smaller < t_1 ) {
-				t_intersection = smaller;
+				t = smaller;
 			} else if ( larger > t_0 && larger < t_1 ) {
-				t_intersection = larger;
+				t = larger;
 			} else {
-				outside_interval = true;
+				hr.miss = true;
 			}
 
+			break;
 		}
+		default:
+			// We shouldn't be here
+			abort();
 
-		// All that is left to do is to update the hit record
-
-		if (outside_interval) {
-			hr.miss = true;
-		} else {
-			hr.miss = false;
-			hr.t = t_intersection;
-			
-			glm::vec3 intersection_point = r.evaluate(t_intersection);
-			glm::vec3 sphere_normal = (intersection_point - m_pos) / (float) m_radius;
-			hr.n = sphere_normal;
-		}
 	}
 
+	if (!hr.miss) {
+		hr.t = t;	
+		glm::vec3 intersection_point = r.evaluate(t);
+		glm::vec3 sphere_normal = (intersection_point - m_pos) / (float) m_radius;
+		hr.n = sphere_normal;
+	}
 }
 
 NonhierBox::~NonhierBox()
