@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <list>
 #include "Ray.hpp"
 
 class Primitive; 
@@ -61,4 +62,12 @@ public:
 private:
 	glm::vec3 m_pos;
 	double m_size;
+};
+
+// Convenience class for determining how a ray hits a group of surfaces...
+struct SurfaceGroup : public Primitive 
+{
+public:
+	virtual void hit(HitRecord &hr, Ray r, float t_0, float t_1) const;
+	std::list<Primitive *> m_surfaces; 
 };

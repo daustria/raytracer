@@ -1,7 +1,9 @@
 #include <glm/ext.hpp>
 #include <assert.h>
 #include "A4.hpp"
+#include "GeometryNode.hpp"
 #include "Ray.hpp"
+#include "Primitive.hpp"
 #define PLANE_WIDTH 100	
 #define PLANE_HEIGHT 100
 #define PLANE_DISTANCE 10
@@ -67,12 +69,18 @@ void A4_Render(
 	size_t w = image.width();
 
 	// For now we'll assume that the root node has its children a list of
-	// surfaces we can hit
-	
-	// We'll initialize the rays in here
-	const std::list<SceneNode *> surfaces = root.children;
+	// geometry node corresponding to non-hierarchical surfaces we can hit 
 
-	// First we need to define the dimensions of our image plane
+	// Let's also assume that the surface we're going to hit is just going to be a sphere, and it corresponds to
+	// the only child of the root node, which we assume to be a geometry node
+	SceneNode * node = root->children.front();
+	const GeometryNode *geometryNode = static_cast<const GeometryNode *>(node);
+	const Primitive *p = geometryNode->m_primitive;
+
+	const NonhierSphere *nh_sphere = static_cast<const NonhierSphere *>(p);
+
+	// Now we need to define the dimensions of our image plane, for 
+	// computing ray directions
 
 	static const float l(-PLANE_WIDTH/2);
 	static const float r(PLANE_WIDTH/2);

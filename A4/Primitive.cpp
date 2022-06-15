@@ -27,12 +27,6 @@ NonhierSphere::~NonhierSphere()
 {
 }
 
-// Return true if t is in the interval (t_0, t_1)
-bool in_interval(float t, float t_0, float t_1)
-{
-	return t > t_0 && t < t_1;
-}
-
 void NonhierSphere::hit(HitRecord &hr, Ray r, float t_0, float t_1) const
 {
 	// Get the quadratic equation whose solutions corresponding to where the 
@@ -103,4 +97,23 @@ void NonhierSphere::hit(HitRecord &hr, Ray r, float t_0, float t_1) const
 
 NonhierBox::~NonhierBox()
 {
+}
+
+// Surface Group ---------------------------------------------------------------------------------
+void SurfaceGroup::hit(HitRecord &hr, Ray r, float t_0, float t_1) const
+{
+	hr.miss = true;
+
+	for (const Primitive *surface : m_surfaces)
+	{
+		HitRecord surface_hr;
+		surface->hit(surface_hr, r, t_0, t_1);
+
+		// If we hit the surface, update the record of the closest hit and
+		// update the upper bound of our interval
+		if (!hr.miss) {
+			hr = surface_hr;
+			t_1 = hr.t;
+		}
+	}
 }
