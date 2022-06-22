@@ -1,5 +1,6 @@
 #include <glm/ext.hpp>
 #include <assert.h>
+#include <iostream>
 #include "A4.hpp"
 #include "GeometryNode.hpp"
 #include "Ray.hpp"
@@ -11,7 +12,7 @@
 // Implement the ray class here
 
 Ray::Ray(const glm::vec3 &origin, const glm::vec3 &direction) 
-	: o(origin), d(direction), origin(origin), direction(direction)
+	: m_origin(origin), m_direction(direction), o(m_origin), d(m_direction)
 {
 	static const float EPSILON_RAY = 0.1f;
 	// Want to make sure our direction is non-zero. I don't want to 
@@ -71,13 +72,28 @@ void A4_Render(
 	// For now we'll assume that the root node has its children a list of
 	// geometry node corresponding to non-hierarchical surfaces we can hit 
 
-	// Let's also assume that the surface we're going to hit is just going to be a sphere, and it corresponds to
-	// the only child of the root node, which we assume to be a geometry node
-	SceneNode * node = root->children.front();
-	const GeometryNode *geometryNode = static_cast<const GeometryNode *>(node);
-	const Primitive *p = geometryNode->m_primitive;
 
-	const NonhierSphere *nh_sphere = static_cast<const NonhierSphere *>(p);
+	std::list<const Primitive *> child_surfaces;
+
+	for (const SceneNode *node : root->children) {
+
+		if (node->m_nodeType != NodeType::GeometryNode) {
+			continue;
+		}
+
+		const GeometryNode *geometryNode = static_cast<const GeometryNode *>(node);	
+
+		child_surfaces.push_back(geometryNode->m_primitive);
+	}
+
+	SurfaceGroup surfaces(child_surfaces);
+
+#ifndef NDEBUG
+	for (const Primitive *p : surfaces.m_surfaces) 
+	{
+		std::cout << *p << std::endl;
+	}
+#endif
 
 	// Now we need to define the dimensions of our image plane, for 
 	// computing ray directions
@@ -87,28 +103,57 @@ void A4_Render(
 	static const float t(PLANE_HEIGHT/2);
 	static const float b(-PLANE_HEIGHT/2);
 
+#ifndef NDEBUG
+	printf("Ray origin:(%f,%f,%f)\n", eye.x, eye.y, eye.z);
+#endif
+
 	for (uint y = 0; y < h; ++y) {
 		for (uint x = 0; x < w; ++x) {
 
 			// Our image dimensions are w by h.
-			// pixel position (i,j) in the image corresponds to the point (u,v) on the pixel plane, and
+			// pixel position (i,j) in the image corresponds to the point (u,v) on the plane (where the ray passes through) and
 			// we compute (u,v) as...
 
 			float u = l + ((float) (r - l)*(x + 0.5f)) / w;
-			float v = b + ((float) (t - b)*(x + 0.5f)) / h;
+			float v = b + ((float) (t - b)*(y + 0.5f)) / h;
 
 			// We construct our rays for a perspective view. The origin and direction are taken from textbook computations
 			// (4.3 of Shirley's book)
-
+		
 			Ray r(eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam);
 
+#ifndef NDEBUG
+			if(x == 127 && y == 127) {
+				printf("Pixel:(%d,%d) | Direction:(%f,%f,%f)\n", x,y, r.d.x, r.d.y, r.d.z);
+			}
+#endif
+			// Intersect the ray with all the surfaces
+			HitRecord hr;
+			// What is a good interval for our ray?...
+			surfaces.hit(hr, r, 0, 2000);
+			//nh_sphere->hit(hr, r, 0, 2000);
 
-			// Red: 
-			image(x, y, 0) = (double)1.0;
-			// Green: 
-			image(x, y, 1) = (double)1.0;
-			// Blue: 
-			image(x, y, 2) = (double)1.0;
+#ifndef NDEBUG
+			if (!hr.miss) {
+				printf("HIT\n");
+			}
+#endif
+
+			// Colour the pixel blue if we hit something, and white otherwise
+
+			if (hr.miss) {
+				// Red: 
+				image(x, y, 0) = (double)1.0;
+				// Green: 
+				image(x, y, 1) = (double)1.0;
+				// Blue: 
+				image(x, y, 2) = (double)1.0;
+			} else {
+				image(x, y, 0) = 0.0;
+				image(x, y, 1) = 0.0;
+				image(x, y, 2) = (double)1.0;
+			}
+
 		}
 	}
 
