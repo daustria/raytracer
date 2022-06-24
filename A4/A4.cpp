@@ -69,11 +69,12 @@ void A4_Render(
 	size_t h = image.height();
 	size_t w = image.width();
 
+	// Get the list of surfaces we need to hit.
+	
 	// For now we'll assume that the root node has its children a list of
-	// geometry node corresponding to non-hierarchical surfaces we can hit 
+	// geometry node corresponding to non-hierarchical surfaces 
 
-
-	std::list<const Primitive *> child_surfaces;
+	std::list<Primitive *> scene_surfaces;
 
 	for (const SceneNode *node : root->children) {
 
@@ -83,10 +84,13 @@ void A4_Render(
 
 		const GeometryNode *geometryNode = static_cast<const GeometryNode *>(node);	
 
-		child_surfaces.push_back(geometryNode->m_primitive);
+		Primitive *surface = geometryNode->m_primitive;
+		surface->m_material = geometryNode->m_material;
+
+		scene_surfaces.push_back(surface);
 	}
 
-	SurfaceGroup surfaces(child_surfaces);
+	SurfaceGroup surfaces(scene_surfaces);
 
 #ifndef NDEBUG
 	for (const Primitive *p : surfaces.m_surfaces) 

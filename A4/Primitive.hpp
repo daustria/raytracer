@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <iostream>
 #include <list>
+#include "Material.hpp"
 #include "Ray.hpp"
 
 class Primitive; 
@@ -37,6 +38,8 @@ public:
 	virtual void hit(HitRecord &hr, Ray r, float t_0, float t_1) const;
 
 	PrimitiveType m_primitiveType;
+
+	Material *m_material; 
 
 	friend std::ostream & operator << (std::ostream &, const Primitive &);
 };
@@ -83,7 +86,7 @@ private:
 // Convenience class for determining how a ray hits a group of surfaces...
 struct SurfaceGroup : public Primitive 
 {
-	SurfaceGroup(const std::list<const Primitive *> & surfaces = {});
+	SurfaceGroup(const std::list<Primitive *> & surfaces = {});
 	virtual void hit(HitRecord &hr, Ray r, float t_0, float t_1) const;
-	std::list<const Primitive *> m_surfaces; 
+	std::list<Primitive *> m_surfaces; 
 };

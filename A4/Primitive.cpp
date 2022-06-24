@@ -3,7 +3,7 @@
 
 static const float epsilon = 0.01f;
 
-Primitive::Primitive() : m_primitiveType(PrimitiveType::None)
+Primitive::Primitive() : m_primitiveType(PrimitiveType::None), m_material(nullptr)
 {
 
 }
@@ -116,7 +116,7 @@ NonhierBox::~NonhierBox()
 }
 
 // Surface Group ---------------------------------------------------------------------------------
-SurfaceGroup::SurfaceGroup(const std::list<const Primitive *> & surfaces) : m_surfaces(surfaces)
+SurfaceGroup::SurfaceGroup(const std::list<Primitive *> & surfaces) : m_surfaces(surfaces)
 {
 	m_primitiveType = PrimitiveType::Group;
 }
