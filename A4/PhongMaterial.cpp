@@ -5,6 +5,8 @@ PhongMaterial::PhongMaterial(
 	: m_kd(kd)
 	, m_ks(ks)
 	, m_shininess(shininess)
+	, kd(m_kd)
+	, ks(m_ks)
 {}
 
 PhongMaterial::~PhongMaterial()

@@ -5,6 +5,7 @@
 #include "GeometryNode.hpp"
 #include "Ray.hpp"
 #include "Primitive.hpp"
+#include "PhongMaterial.hpp"
 #define PLANE_WIDTH 100	
 #define PLANE_HEIGHT 100
 #define PLANE_DISTANCE 10
@@ -143,19 +144,25 @@ void A4_Render(
 			}
 #endif
 
-			// Colour the pixel blue if we hit something, and white otherwise
+			// Colour the pixel blue if we hit something, and black otherwise
 
 			if (hr.miss) {
 				// Red: 
-				image(x, y, 0) = (double)1.0;
+				image(x, y, 0) = 0;
 				// Green: 
-				image(x, y, 1) = (double)1.0;
+				image(x, y, 1) = 0;
 				// Blue: 
-				image(x, y, 2) = (double)1.0;
+				image(x, y, 2) = 0;
 			} else {
-				image(x, y, 0) = 0.0;
-				image(x, y, 1) = 0.0;
-				image(x, y, 2) = (double)1.0;
+				// Assume the material of the surface is a PhongMaterial
+				const Primitive *surface = hr.p;
+				PhongMaterial *mat = static_cast<PhongMaterial *>(surface->m_material);
+
+				const glm::vec3 &colour = mat->kd;
+
+				image(x, y, 0) = (double) colour.r;
+				image(x, y, 1) = (double) colour.g;
+				image(x, y, 2) = (double) colour.b;
 			}
 
 		}

@@ -14,4 +14,9 @@ private:
   glm::vec3 m_ks;
 
   double m_shininess;
+
+public:
+  const glm::vec3 &kd;
+  const glm::vec3 &ks;
+
 };
