@@ -31,8 +31,12 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr) const
 	glm::vec3 l = glm::normalize(position - x); // light direction
 	glm::vec3 n = hr.n; //surface normal, we assume this to be normalized already
 
-	// irradiance, describing the amount of radiant power per unit area 
-	glm::vec3 E = colour * std::fmax(0, glm::dot(n,l)) / glm::length2(position - x); 
+	// irradiance, describing the amount of radiant power per unit area.
+	// This computation of irradiance is specific for point light sources
+	
+	// The point light is too far. Maybe I should not use glm::length2(position - x).
+	// This factor is making my irradiance E extremely small in length
+	glm::vec3 E = colour * (std::fmax(0, glm::dot(n,l)) / glm::length2(position - x));
 
 	// view direction from the surface point
 	glm::vec3 v = -glm::normalize(r.d); 

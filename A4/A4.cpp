@@ -134,29 +134,27 @@ void A4_Render(
 			HitRecord hr;
 			// What is a good interval for our ray?...
 			surfaces.hit(hr, r, 0, 2000);
-			//nh_sphere->hit(hr, r, 0, 2000);
 
-#ifndef NDEBUG
-			if (!hr.miss) {
-				printf("HIT\n");
+
+			if (x == 127 && y == 127) {
+				printf("HERE\n");
 			}
-#endif
-
 			if (hr.miss) {
-				// Colour black
+				// We missed. Just colour it black
 
-				// Red: 
-				image(x, y, 0) = 0;
-				// Green: 
-				image(x, y, 1) = 0;
-				// Blue: 
-				image(x, y, 2) = 0;
+				image(x, y, 0) = 0; //red
+				image(x, y, 1) = 0; //green
+				image(x, y, 2) = 0; //blue
 			} else {
-				// Assume the material of the surface is a PhongMaterial
-				const Primitive *surface = hr.p;
-				PhongMaterial *mat = static_cast<PhongMaterial *>(surface->m_material);
+				// Compute the colour of the pixel, taking into account
+				// the various point-light sources
 
-				const glm::vec3 &colour = mat->kd;
+				glm::vec3 colour;
+
+				for ( const Light *light : lights )
+				{
+					colour = colour + light->illuminate(r, hr);
+				}
 
 				image(x, y, 0) = (double) colour.r;
 				image(x, y, 1) = (double) colour.g;

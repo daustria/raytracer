@@ -10,7 +10,8 @@
 struct Light {
   Light();
   
-  glm::vec3 colour; // Intensity of source ? 
+  // Intensity of source, separate for rgb colour channels
+  glm::vec3 colour; 
   glm::vec3 position;
   double falloff[3];
 
