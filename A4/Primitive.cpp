@@ -107,7 +107,7 @@ void NonhierSphere::hit(HitRecord &hr, Ray r, float t_0, float t_1) const
 		hr.t = t;	
 		glm::vec3 intersection_point = r.evaluate(t);
 		glm::vec3 sphere_normal = (intersection_point - m_pos) / (float) m_radius;
-		hr.n = sphere_normal;
+		hr.n = glm::normalize(sphere_normal);
 	}
 }
 

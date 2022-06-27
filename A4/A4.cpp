@@ -70,6 +70,9 @@ void A4_Render(
 	size_t h = image.height();
 	size_t w = image.width();
 
+	//TODO : It is a good idea to clean this code up with helper functions, but I will do it after
+	// I am more certain about the structure of this function
+
 	// Get the list of surfaces we need to hit.
 	
 	// For now we'll assume that the root node has its children a list of
@@ -127,11 +130,6 @@ void A4_Render(
 		
 			Ray r(eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam);
 
-#ifndef NDEBUG
-			if(x == 127 && y == 127) {
-				printf("Pixel:(%d,%d) | Direction:(%f,%f,%f)\n", x,y, r.d.x, r.d.y, r.d.z);
-			}
-#endif
 			// Intersect the ray with all the surfaces
 			HitRecord hr;
 			// What is a good interval for our ray?...
@@ -144,9 +142,9 @@ void A4_Render(
 			}
 #endif
 
-			// Colour the pixel blue if we hit something, and black otherwise
-
 			if (hr.miss) {
+				// Colour black
+
 				// Red: 
 				image(x, y, 0) = 0;
 				// Green: 
