@@ -34,9 +34,11 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr) const
 	// irradiance, describing the amount of radiant power per unit area.
 	// This computation of irradiance is specific for point light sources
 	
-	// The point light is too far. Maybe I should not use glm::length2(position - x).
-	// This factor is making my irradiance E extremely small in length
-	glm::vec3 E = colour * (std::fmax(0, glm::dot(n,l)) / glm::length2(position - x));
+
+	// We borrow this quadratic attenuation computation from the CS488 course notes
+	float dist = glm::length(position - x);
+	float attenuation = falloff[0] + falloff[1]*dist + falloff[2]*dist*dist;
+	glm::vec3 E = colour * ( std::fmax(0, glm::dot(n,l)) / attenuation );
 
 	// view direction from the surface point
 	glm::vec3 v = -glm::normalize(r.d); 
