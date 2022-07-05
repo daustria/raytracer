@@ -71,16 +71,23 @@ private:
 
 class NonhierBox : public Primitive {
 public:
-	NonhierBox(const glm::vec3& pos, double size)
-		: m_pos(pos), m_size(size)
-	{
-	}
+	NonhierBox(const glm::vec3& pos, double size);
+
+	virtual void hit(HitRecord &hr, Ray r, float t_0, float t_1) const override;
 
 	virtual ~NonhierBox();
 
 private:
+
+	// Given a point on the box, return the surface normal
+	glm::vec3 computeNormal(const glm::vec3 &) const;
+
 	glm::vec3 m_pos;
 	double m_size;
+
+public:
+	const glm::vec3 m_min;
+	const glm::vec3 m_max;
 };
 
 // Convenience class for determining how a ray hits a group of surfaces...
