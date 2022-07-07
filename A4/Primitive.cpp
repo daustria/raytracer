@@ -2,17 +2,18 @@
 #include "polyroots.hpp"
 #include <limits>
 
-static const float epsilon = 0.01f;
+static const float EPSILON = 0.01f;
 
 Primitive::Primitive() : m_primitiveType(PrimitiveType::None), m_material(nullptr)
 {
 
 }
+
 Primitive::~Primitive()
 {
 }
 
-void Primitive::hit(HitRecord &hr, Ray r, float t_0, float t_1) const
+void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	// Default behaviour is just to return a miss
 	hr.p = this;
@@ -40,7 +41,7 @@ NonhierSphere::~NonhierSphere()
 {
 }
 
-void NonhierSphere::hit(HitRecord &hr, Ray r, float t_0, float t_1) const
+void NonhierSphere::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	hr.miss = false;
 
@@ -122,7 +123,6 @@ NonhierBox::NonhierBox(const glm::vec3& pos, double size)
 
 bool approx(float a, float b)
 {
-	static const float EPSILON(0.1f);
 	return abs(a - b) < EPSILON;
 }
 
@@ -164,7 +164,7 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 
 }
 
-void NonhierBox::hit(HitRecord &hr, Ray r, float t_0, float t_1) const 
+void NonhierBox::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const 
 {
 
 	// Implementation of box primitives seems difficult and not much
@@ -212,7 +212,7 @@ SurfaceGroup::SurfaceGroup(const std::list<Primitive *> & surfaces) : m_surfaces
 	m_primitiveType = PrimitiveType::Group;
 }
 
-void SurfaceGroup::hit(HitRecord &hr, Ray r, float t_0, float t_1) const
+void SurfaceGroup::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	hr.miss = true;
 
@@ -262,7 +262,7 @@ std::ostream & operator << (std::ostream & os, const Primitive &p)
 			glm::vec3 bmax{nh_box->m_max};
 
 			sprintf(buffer, "min:(%.2f,%.2f,%.2f) max:(%.2f,%.2f,%.2f)", bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z);
-			os << "NH_Box";
+			os << "NH_Box:";
 			os  << buffer;
 			break;
 		}
@@ -270,9 +270,11 @@ std::ostream & operator << (std::ostream & os, const Primitive &p)
 			os << "Group";
 			// Print each one in the group
 			break;
+		case PrimitiveType::Mesh:
+			os << "Mesh";
+			break;
 		default:
 			printf("%s | Error, default case reached\n", __func__);
-			abort();
 	}
 
 	return os;

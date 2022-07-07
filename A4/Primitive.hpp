@@ -25,6 +25,7 @@ enum class PrimitiveType
 	Cube,
 	NH_Sphere,
 	NH_Box,
+	Mesh,
 	Group
 };
 
@@ -35,7 +36,7 @@ public:
 	
 	// Fill in the HitRecord hr with data about whether the ray r intersected this primitive
 	// in the interval (t_0, t_1)
-	virtual void hit(HitRecord &hr, Ray r, float t_0, float t_1) const;
+	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
 
 	PrimitiveType m_primitiveType;
 
@@ -59,7 +60,7 @@ public:
 	NonhierSphere(const glm::vec3& pos, double radius);
 	virtual ~NonhierSphere();
 
-	virtual void hit(HitRecord &hr, Ray r, float t_0, float t_1) const override;
+	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
 	const glm::vec3 &pos;
 	const double &r;
@@ -73,7 +74,7 @@ class NonhierBox : public Primitive {
 public:
 	NonhierBox(const glm::vec3& pos, double size);
 
-	virtual void hit(HitRecord &hr, Ray r, float t_0, float t_1) const override;
+	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
 	virtual ~NonhierBox();
 
@@ -94,6 +95,6 @@ public:
 struct SurfaceGroup : public Primitive 
 {
 	SurfaceGroup(const std::list<Primitive *> & surfaces = {});
-	virtual void hit(HitRecord &hr, Ray r, float t_0, float t_1) const;
+	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
 	std::list<Primitive *> m_surfaces; 
 };

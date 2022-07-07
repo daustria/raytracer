@@ -10,14 +10,14 @@
 #define PLANE_HEIGHT 100
 #define PLANE_DISTANCE 10
 
-// Implement the ray class here
+// Implement the ray here (i don't want to touch the makefiles, and we gotta put it somewhere..)
 
 Ray::Ray(const glm::vec3 &origin, const glm::vec3 &direction) 
 	: m_origin(origin), m_direction(direction), o(m_origin), d(m_direction)
 {
 	static const float EPSILON_RAY = 0.1f;
 	// Want to make sure our direction is non-zero. I don't want to 
-	// worry about rays with a null direction, because that's just a point
+	// worry about rays with a null direction
 	assert(glm::length2(direction) > EPSILON_RAY^2);
 }
 
@@ -124,6 +124,7 @@ void A4_Render(
 
 			float u = l + ((float) (r - l)*(x + 0.5f)) / w;
 			float v = b + ((float) (t - b)*(y + 0.5f)) / h;
+			v = -v; // negate v, otherwise the images come out flipped 
 
 			// We construct our rays for a perspective view. The origin and direction are taken from textbook computations
 			// (4.3 of Shirley's book)
@@ -132,13 +133,15 @@ void A4_Render(
 
 			// Intersect the ray with all the surfaces
 			HitRecord hr;
+
+			if ( x == 127 && y == 127 ) {
+				printf("here\n");
+			}
+
 			// What is a good interval for our ray?...
 			surfaces.hit(hr, r, 0, 2000);
 
 
-			if (x == 127 && y == 127) {
-				printf("HERE\n");
-			}
 			if (hr.miss) {
 				// We missed. Just colour it black
 
@@ -156,6 +159,7 @@ void A4_Render(
 
 				for ( const Light *light : lights )
 				{
+					// What happens if we exceed 1.0 ? ..
 					colour = colour + light->illuminate(r, hr);
 				}
 
