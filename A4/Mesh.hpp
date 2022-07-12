@@ -38,6 +38,7 @@ public:
 
 private:
 	void hitTriangle(HitRecord &hr, const Ray &r, float t_0, float t_1, const Triangle &tri) const;
+	virtual void transformPrimitive(const glm::mat4 &) override;
 
 	std::vector<glm::vec3> m_vertices;
 	std::vector<Triangle> m_faces;

@@ -149,6 +149,13 @@ void Mesh::hitTriangle(HitRecord &hr, const Ray &r, float t_0, float t_1, const 
 	// We'll set the primitive pointer as the mesh outside this helper function
 }
 
+void Mesh::transformPrimitive(const glm::mat4 &m) 
+{
+	for (glm::vec3 &vertex : m_vertices) {
+		transformVertex(vertex, m);
+	}
+}
+
 std::ostream& operator<<(std::ostream& out, const Mesh& mesh)
 {
 	out << "mesh {";

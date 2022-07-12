@@ -38,12 +38,17 @@ public:
 	// in the interval (t_0, t_1)
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
 
+
+	virtual void transformPrimitive(const glm::mat4 &);
+
 	PrimitiveType m_primitiveType;
 
 	Material *m_material; 
-
 	friend std::ostream & operator << (std::ostream &, const Primitive &);
+
 };
+
+void transformVertex(glm::vec3 &vertex, const glm::mat4 &transform);
 
 class Sphere : public Primitive {
 public:
@@ -55,12 +60,14 @@ public:
 	virtual ~Cube();
 };
 
+// For the nonhierarchical shapes, we will assume they are untransformed.
 class NonhierSphere : public Primitive {
 public:
 	NonhierSphere(const glm::vec3& pos, double radius);
 	virtual ~NonhierSphere();
 
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
+	virtual void transformPrimitive(const glm::mat4 &) override;
 
 	const glm::vec3 &pos;
 	const double &r;
@@ -76,6 +83,11 @@ public:
 
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
+	virtual void transformPrimitive(const glm::mat4 &) override;
+
+	const glm::vec3 &bmin() const;
+	const glm::vec3 &bmax() const;
+
 	virtual ~NonhierBox();
 
 private:
@@ -85,10 +97,8 @@ private:
 
 	glm::vec3 m_pos;
 	double m_size;
-
-public:
-	const glm::vec3 m_min;
-	const glm::vec3 m_max;
+	glm::vec3 m_min;
+	glm::vec3 m_max;
 };
 
 // Convenience class for determining how a ray hits a group of surfaces...

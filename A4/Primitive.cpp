@@ -21,24 +21,51 @@ void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 	return;
 }
 
-Sphere::~Sphere()
+void transformVertex(glm::vec3 &v, const glm::mat4 &m) 
 {
+	glm::vec4 v_hom = {v.x, v.y, v.z, 1.0f};
+	v_hom = m*v_hom;
+
+	if (v_hom.w == 0) {
+		// Can't homogenize the vector so just bail out.
+		return;
+	} 
+
+	v = {v_hom.x/v_hom.w, v_hom.y/v_hom.w, v_hom.z/v_hom.w};
 }
 
+void Primitive::transformPrimitive(const glm::mat4 &m)
+{
+	// Default behaviour is to do nothing. The inheriting primitives
+	// should override this function to apply the matrix m to their vertices
+}
+
+// Sphere ----------------------------------------------------------------------------
+Sphere::~Sphere()
+{
+
+}
+
+// Cube ----------------------------------------------------------------------------
 Cube::~Cube()
 {
+
 }
 
 // Nonhier Sphere --------------------------------------------------------------------
-
-NonhierSphere::NonhierSphere(const glm::vec3& pos, double radius)
-	: m_pos(pos), m_radius(radius), pos(m_pos), r(m_radius)
+NonhierSphere::NonhierSphere(const glm::vec3& position, double radius)
+	: m_pos(position), m_radius(radius), pos(m_pos), r(m_radius)
 {
 	m_primitiveType = PrimitiveType::NH_Sphere;
 }
 
 NonhierSphere::~NonhierSphere()
 {
+}
+
+void NonhierSphere::transformPrimitive(const glm::mat4 &m)
+{
+	transformVertex(m_pos, m);
 }
 
 void NonhierSphere::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
@@ -173,15 +200,15 @@ void NonhierBox::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 	float tmin = 0;
 	float tmax = std::numeric_limits<float>::infinity();
 
-	glm::vec3 m_min = m_pos;
-	glm::vec3 m_max = m_pos + glm::vec3(m_size);
+	glm::vec3 bmin = m_min;
+	glm::vec3 bmax = m_max;
 
 	for (int i = 0; i < 3; ++i) {
 		// Note : we assume our rays always have non-zero direction before
 		// trying to intersect them
 
-		float t1 = (m_min[i] - r.o[i])/r.d[i];
-		float t2 = (m_max[i] - r.o[i])/r.d[i];
+		float t1 = (bmin[i] - r.o[i])/r.d[i];
+		float t2 = (bmax[i] - r.o[i])/r.d[i];
 
 		tmin = std::max(tmin, std::min(t1, t2));
 		tmax = std::min(tmax, std::max(t1, t2));
@@ -202,8 +229,26 @@ void NonhierBox::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 
 }
 
+void NonhierBox::transformPrimitive(const glm::mat4 &m) 
+{
+	transformVertex(m_pos, m);
+	m_min = m_pos;
+	m_max = m_pos + glm::vec3(m_size);
+}
+
+const glm::vec3 &NonhierBox::bmin() const
+{
+	return m_min;
+}
+
+const glm::vec3 &NonhierBox::bmax() const
+{
+	return m_max;
+}
+
 NonhierBox::~NonhierBox()
 {
+
 }
 
 // Surface Group ---------------------------------------------------------------------------------
@@ -258,8 +303,8 @@ std::ostream & operator << (std::ostream & os, const Primitive &p)
 		case PrimitiveType::NH_Box:
 		{
 			const NonhierBox *nh_box = static_cast<const NonhierBox *>(&p);
-			glm::vec3 bmin{nh_box->m_min};
-			glm::vec3 bmax{nh_box->m_max};
+			glm::vec3 bmin{nh_box->bmin()};
+			glm::vec3 bmax{nh_box->bmax()};
 
 			sprintf(buffer, "min:(%.2f,%.2f,%.2f) max:(%.2f,%.2f,%.2f)", bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z);
 			os << "NH_Box:";

@@ -34,7 +34,6 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr) const
 	// irradiance, describing the amount of radiant power per unit area.
 	// This computation of irradiance is specific for point light sources
 	
-
 	// We borrow this quadratic attenuation computation from the CS488 course notes
 	float dist = glm::length(position - x);
 	float attenuation = falloff[0] + falloff[1]*dist + falloff[2]*dist*dist;
