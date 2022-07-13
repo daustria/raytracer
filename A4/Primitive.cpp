@@ -4,7 +4,7 @@
 
 static const float EPSILON = 0.01f;
 
-Primitive::Primitive() : m_primitiveType(PrimitiveType::None), m_material(nullptr)
+Primitive::Primitive() : m_primitiveType(PrimitiveType::None), m_material(nullptr), m_transform(1.0f)
 {
 
 }
@@ -34,11 +34,6 @@ void transformVertex(glm::vec3 &v, const glm::mat4 &m)
 	v = {v_hom.x/v_hom.w, v_hom.y/v_hom.w, v_hom.z/v_hom.w};
 }
 
-void Primitive::transformPrimitive(const glm::mat4 &m)
-{
-	// Default behaviour is to do nothing. The inheriting primitives
-	// should override this function to apply the matrix m to their vertices
-}
 
 // Sphere ----------------------------------------------------------------------------
 Sphere::~Sphere()
@@ -63,10 +58,6 @@ NonhierSphere::~NonhierSphere()
 {
 }
 
-void NonhierSphere::transformPrimitive(const glm::mat4 &m)
-{
-	transformVertex(m_pos, m);
-}
 
 void NonhierSphere::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
@@ -200,15 +191,13 @@ void NonhierBox::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 	float tmin = 0;
 	float tmax = std::numeric_limits<float>::infinity();
 
-	glm::vec3 bmin = m_min;
-	glm::vec3 bmax = m_max;
 
 	for (int i = 0; i < 3; ++i) {
 		// Note : we assume our rays always have non-zero direction before
 		// trying to intersect them
 
-		float t1 = (bmin[i] - r.o[i])/r.d[i];
-		float t2 = (bmax[i] - r.o[i])/r.d[i];
+		float t1 = (m_min[i] - r.o[i])/r.d[i];
+		float t2 = (m_min[i] - r.o[i])/r.d[i];
 
 		tmin = std::max(tmin, std::min(t1, t2));
 		tmax = std::min(tmax, std::max(t1, t2));
@@ -227,13 +216,6 @@ void NonhierBox::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 		hr.miss = true;
 	}
 
-}
-
-void NonhierBox::transformPrimitive(const glm::mat4 &m) 
-{
-	transformVertex(m_pos, m);
-	m_min = m_pos;
-	m_max = m_pos + glm::vec3(m_size);
 }
 
 const glm::vec3 &NonhierBox::bmin() const

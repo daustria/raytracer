@@ -11,9 +11,10 @@ class Primitive;
 struct HitRecord 
 {
 	const Primitive *p; // surface that was hit
-	float t; // Point along the ray where the intersection happened
+	float t; // parameter of the ray where the intersection happened
 	bool miss; // Whether the ray actually hit the surface or not
 	glm::vec3 n; // Normal of surface at the intersection point
+	glm::vec3 hit_point; // point on the surface that was hit 
 
 	// We may need more things like texture coordinates, later on
 };
@@ -38,12 +39,11 @@ public:
 	// in the interval (t_0, t_1)
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
 
-
-	virtual void transformPrimitive(const glm::mat4 &);
-
-	PrimitiveType m_primitiveType;
+	PrimitiveType m_primitiveType;	
 
 	Material *m_material; 
+	glm::mat4 m_transform; // What the primitive is transformed by.. but really we are going to 
+	// use this to transform the ray 
 	friend std::ostream & operator << (std::ostream &, const Primitive &);
 
 };
@@ -67,7 +67,6 @@ public:
 	virtual ~NonhierSphere();
 
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
-	virtual void transformPrimitive(const glm::mat4 &) override;
 
 	const glm::vec3 &pos;
 	const double &r;
@@ -83,7 +82,6 @@ public:
 
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
-	virtual void transformPrimitive(const glm::mat4 &) override;
 
 	const glm::vec3 &bmin() const;
 	const glm::vec3 &bmax() const;

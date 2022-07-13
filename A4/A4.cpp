@@ -99,7 +99,7 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, Matrix
 			// We also need to prepare the primitive with the right properties
 			Primitive *surface = geometryNode->m_primitive;
 			surface->m_material = geometryNode->m_material;
-			surface->transformPrimitive(ms.active_transform);
+			surface->m_transform = ms.active_transform;
 
 			scene_surfaces.push_back(surface);
 			break;
@@ -249,7 +249,7 @@ void A4_Render(
 
 			float u = l + ((float) (r - l)*(x + 0.5f)) / w;
 			float v = b + ((float) (t - b)*(y + 0.5f)) / h;
-			//v = -v; // negate v, otherwise the images come out flipped 
+			v = -v; // negate v, otherwise the images come out flipped 
 
 			// We construct our rays for a perspective view. The origin and direction are taken from textbook computations
 			// (4.3 of Shirley's book)
