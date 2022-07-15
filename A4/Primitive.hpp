@@ -39,16 +39,22 @@ public:
 	// in the interval (t_0, t_1)
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
 
+	// Hit the untransformed object
+	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
+
 	PrimitiveType m_primitiveType;	
 
 	Material *m_material; 
 	glm::mat4 m_transform; // What the primitive is transformed by.. but really we are going to 
 	// use this to transform the ray 
+	
+	glm::mat4 m_inverseTrans; // Store this too so I don't have to compute it again
+	
 	friend std::ostream & operator << (std::ostream &, const Primitive &);
 
 };
 
-void transformVertex(glm::vec3 &vertex, const glm::mat4 &transform);
+void transformVector(glm::vec3 &vertex, const glm::mat4 &transform);
 
 class Sphere : public Primitive {
 public:
@@ -66,7 +72,7 @@ public:
 	NonhierSphere(const glm::vec3& pos, double radius);
 	virtual ~NonhierSphere();
 
-	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
+	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
 	const glm::vec3 &pos;
 	const double &r;
@@ -80,7 +86,7 @@ class NonhierBox : public Primitive {
 public:
 	NonhierBox(const glm::vec3& pos, double size);
 
-	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
+	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
 
 	const glm::vec3 &bmin() const;

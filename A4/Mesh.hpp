@@ -34,8 +34,7 @@ class Mesh : public Primitive {
 public:
 	Mesh( const std::string& fname );
 
-	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
-
+	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 private:
 	void hitTriangle(HitRecord &hr, const Ray &r, float t_0, float t_1, const Triangle &tri) const;
 

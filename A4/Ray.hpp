@@ -7,7 +7,12 @@ class Ray
 public:
 	// Custom constructor, just want to check that the direction is not zero
 	Ray(const glm::vec3 &origin, const glm::vec3 &direction);
+
 	glm::vec3 evaluate(float t) const;
+
+	// Transforms the ray by left multiplying m
+	void transform(const glm::mat4 &m);
+
 private:
 	glm::vec3 m_origin;
 	glm::vec3 m_direction;

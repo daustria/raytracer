@@ -27,7 +27,7 @@ std::ostream& operator<<(std::ostream& out, const Light& l)
 
 glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr) const
 {
-	glm::vec3 x = r.evaluate(hr.t); // Point on surface that was hit
+	glm::vec3 x = hr.hit_point;
 	glm::vec3 l = glm::normalize(position - x); // light direction
 	glm::vec3 n = hr.n; //surface normal, we assume this to be normalized already
 

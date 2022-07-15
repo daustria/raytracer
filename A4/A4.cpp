@@ -27,6 +27,26 @@ glm::vec3 Ray::evaluate(float t) const
 	return o + t*d;
 }
 
+void Ray::transform(const glm::mat4 &m)
+{
+	// First transform the origin..
+	glm::vec4 o_{o, 1.0f};
+	glm::vec4 d_{d, 0.0f};
+
+	o_ = m*o_;
+	d_ = m*d_;
+
+
+	if (o_.w == 1.0f) {
+		m_origin = glm::vec3{o_.x, o_.y, o_.z};
+	} else {
+		// this division shouldnt actually be necessary
+		m_origin = glm::vec3{o_.x, o_.y, o_.z} * (1 / (o_.w));
+	}
+
+	m_direction = glm::mat3(m)*d;
+}
+
 // Matrix Stack ------------------------------------------------------------------
 // Convenience struct for handling the active transformation
 // when walking the scene graph. Copied from A3
@@ -99,7 +119,9 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, Matrix
 			// We also need to prepare the primitive with the right properties
 			Primitive *surface = geometryNode->m_primitive;
 			surface->m_material = geometryNode->m_material;
-			surface->m_transform = ms.active_transform;
+
+			// surface->m_transform = ms.active_transform;
+			// surface->m_transform = geometryNode->trans;
 
 			scene_surfaces.push_back(surface);
 			break;
@@ -211,11 +233,20 @@ void A4_Render(
 	size_t h = image.height();
 	size_t w = image.width();
 
+	// For now use non-hierarchical transformations..
 	std::list<Primitive *> scene_surfaces;
-	MatrixStack ms;
+	for (const SceneNode *node : root->children) {
+		if (node->m_nodeType != NodeType::GeometryNode) {
+			continue;
+		}
+		const GeometryNode *geometryNode = static_cast<const GeometryNode *>(node);	
+		Primitive *surface = geometryNode->m_primitive;
+		surface->m_material = geometryNode->m_material;
+		surface->m_transform = root->trans * geometryNode->trans;
+		surface->m_inverseTrans = glm::inverse(surface->m_transform);
 
-	// Prepare the primitives and their transformations by walking the scene graph
-	processNode(*root, scene_surfaces, ms);
+		scene_surfaces.push_back(surface);
+	}
 
 	SurfaceGroup surfaces(scene_surfaces);
 
@@ -260,14 +291,21 @@ void A4_Render(
 
 			// Intersect the ray with all the surfaces
 			surfaces.hit(hr, r, 0, RAY_DISTANCE);
+			
+			// some debugging code.. i just change x and y to be the pixels i want
+			if ( x == 250 && y == 250 ) {
+				printf("HERE\n");
+			}
 
+			// Primitive *front = surfaces.m_surfaces.front();
+			// front->hit(hr, r, 0, RAY_DISTANCE);
 
 			if (hr.miss) {
 				// We missed. Just colour it black
 
-				image(x, y, 0) = 0; //red
-				image(x, y, 1) = 0; //green
-				image(x, y, 2) = 0; //blue
+				image(x, y, 0) = 1.0f; //red
+				image(x, y, 1) = 1.0f; //green
+				image(x, y, 2) = 1.0f; //blue
 			} else {
 				// Compute the colour of the pixel, taking into account
 				// the various point-light sources

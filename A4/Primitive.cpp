@@ -13,7 +13,7 @@ Primitive::~Primitive()
 {
 }
 
-void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+void Primitive::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	// Default behaviour is just to return a miss
 	hr.p = this;
@@ -21,17 +21,56 @@ void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 	return;
 }
 
-void transformVertex(glm::vec3 &v, const glm::mat4 &m) 
+void homogenize(glm::vec4 &v)
 {
-	glm::vec4 v_hom = {v.x, v.y, v.z, 1.0f};
-	v_hom = m*v_hom;
+	if (v.w == 0) {
+		return;
+	}
 
-	if (v_hom.w == 0) {
+	v.x = v.x/v.w;
+	v.y = v.y/v.w;
+	v.z = v.z/v.w;
+	v.w = 1.0f;
+}
+
+void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+{
+	// First we construct the ray with the inverse transformation left-multiplied 
+
+	Ray r_t(r.o, r.d);
+	r_t.transform(m_inverseTrans);
+
+	// Now hit the base object with the transformed ray
+	
+	hit_base(hr, r_t, t_0, t_1);
+
+	if (!hr.miss) {
+		// Get the matrix for transforming normals
+		glm::mat3 normalTransform = glm::mat3(glm::transpose(m_inverseTrans));
+		hr.n = glm::normalize(normalTransform * hr.n);
+
+		// Transform the intersection point also 
+		transformVector(hr.hit_point, m_transform);
+
+		// The nice thing is we do not need to change hr.t .
+	} else {
+		// we did not hit the base object with the transformed ray.
+		// so we say that the ray did not hit the transformed object.
+		hr.miss = true;
+	}
+}
+
+void transformVector(glm::vec3 &v, const glm::mat4 &m) 
+{
+	glm::vec4 u = m * glm::vec4{v, 1.0f};
+
+	if (u.w == 0) {
+		printf("%s | Error, cannot homogenize vector \n", __func__);
 		// Can't homogenize the vector so just bail out.
 		return;
 	} 
 
-	v = {v_hom.x/v_hom.w, v_hom.y/v_hom.w, v_hom.z/v_hom.w};
+	v = glm::vec3{u.x/u.w, u.y/u.w, u.z/u.w};
 }
 
 
@@ -59,7 +98,7 @@ NonhierSphere::~NonhierSphere()
 }
 
 
-void NonhierSphere::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+void NonhierSphere::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	hr.miss = false;
 
@@ -128,9 +167,9 @@ void NonhierSphere::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 		glm::vec3 intersection_point = r.evaluate(t);
 		glm::vec3 sphere_normal = (intersection_point - m_pos) / (float) m_radius;
 		hr.n = glm::normalize(sphere_normal);
+		hr.hit_point = intersection_point;
 	}
 }
-
 
 // Nonhier Box --------------------------------------------------------------------
 NonhierBox::NonhierBox(const glm::vec3& pos, double size)
@@ -182,14 +221,13 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 
 }
 
-void NonhierBox::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const 
+void NonhierBox::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const 
 {
-
 	// Implementation of box primitives seems difficult and not much
 	// official resources. I think I'll just leave box as triangle meshes
 	// and worry about ray triangle intersections
-	float tmin = 0;
-	float tmax = std::numeric_limits<float>::infinity();
+	float tmin = t_0;
+	float tmax = t_1;
 
 
 	for (int i = 0; i < 3; ++i) {
@@ -197,7 +235,7 @@ void NonhierBox::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 		// trying to intersect them
 
 		float t1 = (m_min[i] - r.o[i])/r.d[i];
-		float t2 = (m_min[i] - r.o[i])/r.d[i];
+		float t2 = (m_max[i] - r.o[i])/r.d[i];
 
 		tmin = std::max(tmin, std::min(t1, t2));
 		tmax = std::min(tmax, std::max(t1, t2));
@@ -209,7 +247,8 @@ void NonhierBox::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 		hr.p = this;
 		hr.t = tmin;
 		hr.miss = false;
-		hr.n = computeNormal(r.evaluate(tmin));
+		hr.hit_point = r.evaluate(tmin);
+		hr.n = computeNormal(hr.hit_point);
 	} else {
 		hr.p = this;
 		hr.t = -1;

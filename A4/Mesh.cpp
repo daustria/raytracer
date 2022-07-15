@@ -52,7 +52,7 @@ Mesh::Mesh( const std::string& fname )
 	m_primitiveType = PrimitiveType::Mesh;
 }
 
-void Mesh::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+void Mesh::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	// We follow the same logic as intersecting a group of surfaces,
 	// since a mesh can be thought of as a gorup of triangles.
