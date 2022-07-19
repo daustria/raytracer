@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <iostream>
 #include <list>
+#include <string>
 #include "Material.hpp"
 #include "Ray.hpp"
 
@@ -37,7 +38,7 @@ public:
 	
 	// Fill in the HitRecord hr with data about whether the ray r intersected this primitive
 	// in the interval (t_0, t_1)
-	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
+	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const glm::mat4 &m = glm::mat4(1.0f)) const;
 
 	// Hit the untransformed object
 	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
@@ -45,10 +46,8 @@ public:
 	PrimitiveType m_primitiveType;	
 
 	Material *m_material; 
-	glm::mat4 m_transform; // What the primitive is transformed by.. but really we are going to 
-	// use this to transform the ray 
-	
-	glm::mat4 m_inverseTrans; // Store this too so I don't have to compute it again
+
+	std::string m_name; // Corresponds to the name of the geometry node where we got the material from
 	
 	friend std::ostream & operator << (std::ostream &, const Primitive &);
 
@@ -108,7 +107,10 @@ private:
 // Convenience class for determining how a ray hits a group of surfaces...
 struct SurfaceGroup : public Primitive 
 {
-	SurfaceGroup(const std::list<Primitive *> & surfaces = {});
+	SurfaceGroup(const std::list<Primitive *> & surfaces = {}, const std::list<glm::mat4> &transforms = {});
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
+
+	// Maybe we should also store material? And name? Perhaps just keep another bookkeeping class called PrimitiveParameters or something
 	std::list<Primitive *> m_surfaces; 
+	std::list<glm::mat4> m_transforms;
 };

@@ -4,7 +4,7 @@
 
 static const float EPSILON = 0.01f;
 
-Primitive::Primitive() : m_primitiveType(PrimitiveType::None), m_material(nullptr), m_transform(1.0f)
+Primitive::Primitive() : m_primitiveType(PrimitiveType::None), m_material(nullptr)
 {
 
 }
@@ -33,24 +33,23 @@ void homogenize(glm::vec4 &v)
 	v.w = 1.0f;
 }
 
-void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const glm::mat4 &m) const
 {
+	glm::mat4 inv = glm::inverse(m);
 	// First we construct the ray with the inverse transformation left-multiplied 
-
 	Ray r_t(r.o, r.d);
-	r_t.transform(m_inverseTrans);
+	r_t.transform(inv);
 
-	// Now hit the base object with the transformed ray
-	
+	// Now hit the base object with the transformed ray	
 	hit_base(hr, r_t, t_0, t_1);
 
 	if (!hr.miss) {
 		// Get the matrix for transforming normals
-		glm::mat3 normalTransform = glm::mat3(glm::transpose(m_inverseTrans));
+		glm::mat3 normalTransform = glm::mat3(glm::transpose(inv));
 		hr.n = glm::normalize(normalTransform * hr.n);
 
 		// Transform the intersection point also 
-		transformVector(hr.hit_point, m_transform);
+		transformVector(hr.hit_point, m);
 
 		// The nice thing is we do not need to change hr.t .
 	} else {
@@ -192,6 +191,8 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 	// y = min.y		y = max.y
 	// z = min.z		z = max.z
 
+	static bool hit_error(false);
+
 	if (approx(p.x, m_min.x)) {
 		return {-1.0f, 0, 0};
 	}
@@ -216,7 +217,11 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 		return {0, 0, -1.0f};
 	}
 
-	printf("%s | Error: no normal computed for point {%.2f,%.2f,%.2f}\n", __func__, p.x, p.y, p.z);
+	if (!hit_error) {
+		printf("%s | Error: no normal computed for point {%.2f,%.2f,%.2f}\n", __func__, p.x, p.y, p.z);
+		hit_error = true;
+	}
+
 	return {0,0,0};
 
 }
@@ -273,19 +278,29 @@ NonhierBox::~NonhierBox()
 }
 
 // Surface Group ---------------------------------------------------------------------------------
-SurfaceGroup::SurfaceGroup(const std::list<Primitive *> & surfaces) : m_surfaces(surfaces)
+SurfaceGroup::SurfaceGroup(const std::list<Primitive *> & surfaces, const std::list<glm::mat4> &transforms) : 
+	m_surfaces(surfaces), m_transforms(transforms)
+
 {
 	m_primitiveType = PrimitiveType::Group;
 }
 
 void SurfaceGroup::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
+	assert(m_surfaces.size() == m_transforms.size());
+
 	hr.miss = true;
 
-	for (const Primitive *surface : m_surfaces)
+	std::list<Primitive *>::const_iterator i = m_surfaces.begin();
+	std::list<glm::mat4>::const_iterator j = m_transforms.begin();
+
+	while (i != m_surfaces.end())
 	{
+		const Primitive *surface = *i;
+		const glm::mat4 &trans = *j;
+
 		HitRecord surface_hr;
-		surface->hit(surface_hr, r, t_0, t_1);
+		surface->hit(surface_hr, r, t_0, t_1, trans);
 
 		// If we hit the surface, update the record of the closest hit and
 		// update the upper bound of our interval
@@ -293,12 +308,17 @@ void SurfaceGroup::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 			hr = surface_hr;
 			t_1 = hr.t;
 		}
+
+		++i;
+		++j;
 	}
+
 }
 
 std::ostream & operator << (std::ostream & os, const Primitive &p)
 {
 	char buffer[100]; // For string formatting
+	os << "NAME:" << p.m_name << std::endl;
 	switch(p.m_primitiveType)
 	{
 		case PrimitiveType::None:

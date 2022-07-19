@@ -1,4 +1,5 @@
 #include <glm/ext.hpp>
+#include <glm/gtx/io.hpp>
 #include <assert.h>
 #include <iostream>
 #include <stack>
@@ -31,11 +32,8 @@ void Ray::transform(const glm::mat4 &m)
 {
 	// First transform the origin..
 	glm::vec4 o_{o, 1.0f};
-	glm::vec4 d_{d, 0.0f};
 
 	o_ = m*o_;
-	d_ = m*d_;
-
 
 	if (o_.w == 1.0f) {
 		m_origin = glm::vec3{o_.x, o_.y, o_.z};
@@ -49,8 +47,11 @@ void Ray::transform(const glm::mat4 &m)
 
 // Matrix Stack ------------------------------------------------------------------
 // Convenience struct for handling the active transformation
-// when walking the scene graph. Copied from A3
+// when walking the scene graph. Copied from A3 
 struct MatrixStack {
+	// TODO : Make this class keep inverse transformations. Or 
+	// come up with another solution so that we don't compute inverse transformation matrices
+	// when we do the ray object intersection 
 	MatrixStack();
 
 	// Right multiplies the active transform by m. Requires
@@ -66,11 +67,13 @@ struct MatrixStack {
 	// Matrix representing the product of all transformations
 	// in the stack matrices
 	glm::mat4 active_transform;
+	glm::mat4 active_inverse;
 	std::stack<glm::mat4> matrices;
+	std::stack<glm::mat4> inverses;
 };
 
 //----------------------------------------------------------------------------------------
-MatrixStack::MatrixStack() : active_transform(glm::mat4(1.0f))
+MatrixStack::MatrixStack() : active_transform(glm::mat4(1.0f)), active_inverse(glm::mat4(1.0f))
 {
 
 }
@@ -103,32 +106,41 @@ void MatrixStack::reset()
 
 // A few helper functions for walking the scene graph and preparing the primitives.
 
-// We'll use mutual recursion like in A3
-void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, MatrixStack &ms);
+void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, std::list<glm::mat4> &scene_transforms, MatrixStack &ms);
 
-void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, MatrixStack &ms)
+void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, std::list<glm::mat4> &scene_transforms, MatrixStack &ms)
 {
+	// First thing is to push the node's local transform 
+	ms.push(node.get_transform());	
+
 	switch(node.m_nodeType)
 	{
 		case NodeType::GeometryNode:
 		{
 			const GeometryNode *geometryNode = static_cast<const GeometryNode *>(&node);
-			// Push the node's transform
-			ms.push(geometryNode->get_transform());	
 
 			// We also need to prepare the primitive with the right properties
+
+
+			// Error: these Primitive pointers are shared. I need to change this so that either I walk the scene graph on each render,
+			// or I make a new Primitive.
 			Primitive *surface = geometryNode->m_primitive;
+
+			// This code here should probably altered slightly since now we know that primitive pointers are shared, and
+			// our work here could be overwritten
 			surface->m_material = geometryNode->m_material;
+			surface->m_name = geometryNode->m_name;
 
-			// surface->m_transform = ms.active_transform;
-			// surface->m_transform = geometryNode->trans;
+			// Store the transformations right into the primitives.
+			// I'm not sure if this is the best way to do this, we could alternatively walk
+			// the scene graph for every ray, avoiding having to store transformations.
 
+			scene_transforms.push_back(ms.active_transform);
 			scene_surfaces.push_back(surface);
 			break;
 		}
 		case NodeType::SceneNode:
-			// For the Scene node, we do nothing but push the local transform
-			ms.push(node.get_transform());
+			// Do nothing
 			break;
 		case NodeType::JointNode:
 			// We aren't using joint nodes right now, so fall through to failure case
@@ -141,14 +153,14 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, Matrix
 	// (make a copy first so we can safely modify the list in the mutual recursion)
 	
 	std::list<SceneNode *> children_copy = node.children;
-	processNodeList(children_copy, scene_surfaces, ms);
+	processNodeList(children_copy, scene_surfaces, scene_transforms, ms);
 
 	// We have processed all of its node's children, so we can safely pop off the transformation
 	// local to this node
 	ms.pop();
 }
 
-void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, MatrixStack &ms)
+void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, std::list<glm::mat4> &scene_transforms, MatrixStack &ms)
 {
 	if(nodes.empty()) {
 		return;
@@ -157,8 +169,8 @@ void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scen
 	SceneNode *first = nodes.front();
 	nodes.pop_front();
 
-	processNode(*first, scene_surfaces, ms);
-	processNodeList(nodes, scene_surfaces, ms);
+	processNode(*first, scene_surfaces, scene_transforms, ms);
+	processNodeList(nodes, scene_surfaces, scene_transforms, ms);
 }
 
 void printPercentDone(size_t current_col, size_t total_cols)
@@ -233,27 +245,21 @@ void A4_Render(
 	size_t h = image.height();
 	size_t w = image.width();
 
-	// For now use non-hierarchical transformations..
+	// Walk the scene graph and collect the surfaces with their corresponding transformations
 	std::list<Primitive *> scene_surfaces;
-	for (const SceneNode *node : root->children) {
-		if (node->m_nodeType != NodeType::GeometryNode) {
-			continue;
-		}
-		const GeometryNode *geometryNode = static_cast<const GeometryNode *>(node);	
-		Primitive *surface = geometryNode->m_primitive;
-		surface->m_material = geometryNode->m_material;
-		surface->m_transform = root->trans * geometryNode->trans;
-		surface->m_inverseTrans = glm::inverse(surface->m_transform);
+	std::list<glm::mat4> scene_transforms;
+	MatrixStack ms{};
 
-		scene_surfaces.push_back(surface);
-	}
+	processNode(*root, scene_surfaces, scene_transforms, ms);
 
-	SurfaceGroup surfaces(scene_surfaces);
+	SurfaceGroup surfaces(scene_surfaces, scene_transforms);
+
 
 #ifndef NDEBUG
 	for (const Primitive *p : surfaces.m_surfaces) 
 	{
-		std::cout << *p << std::endl;
+		std::cout << *p << std::endl;	
+		//std::cout << p->m_transform << std::endl;
 	}
 #endif
 
@@ -266,7 +272,7 @@ void A4_Render(
 	static const float b(-PLANE_HEIGHT/2);
 
 #ifndef NDEBUG
-	printf("Ray origin:(%f,%f,%f)\n", eye.x, eye.y, eye.z);
+	// printf("Ray origin:(%f,%f,%f)\n", eye.x, eye.y, eye.z);
 #endif
 
 	for (uint y = 0; y < h; ++y) {
@@ -294,7 +300,7 @@ void A4_Render(
 			
 			// some debugging code.. i just change x and y to be the pixels i want
 			if ( x == 250 && y == 250 ) {
-				printf("HERE\n");
+				//printf("HERE\n");
 			}
 
 			// Primitive *front = surfaces.m_surfaces.front();
@@ -303,9 +309,9 @@ void A4_Render(
 			if (hr.miss) {
 				// We missed. Just colour it black
 
-				image(x, y, 0) = 1.0f; //red
-				image(x, y, 1) = 1.0f; //green
-				image(x, y, 2) = 1.0f; //blue
+				image(x, y, 0) = 0.3f;
+				image(x, y, 1) = 0.3f;
+				image(x, y, 2) = 1.0f;
 			} else {
 				// Compute the colour of the pixel, taking into account
 				// the various point-light sources
