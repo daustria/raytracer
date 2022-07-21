@@ -8,9 +8,9 @@
 #include "Ray.hpp"
 #include "Primitive.hpp"
 #include "PhongMaterial.hpp"
-#define PLANE_WIDTH 100	
+#define PLANE_WIDTH 100
 #define PLANE_HEIGHT 100
-#define PLANE_DISTANCE 10
+#define PLANE_DISTANCE 100
 #define RAY_DISTANCE 2000
 
 // Ray --------------------------------------------------------------------------
@@ -81,8 +81,12 @@ MatrixStack::MatrixStack() : active_transform(glm::mat4(1.0f)), active_inverse(g
 //----------------------------------------------------------------------------------------
 void MatrixStack::push(const glm::mat4 &m)
 {
+	glm::mat4 inv = glm::mat4(m);
+
 	matrices.push(m);
+	inverses.push(inv);
 	active_transform = active_transform*m;
+	active_inverse = inv * active_inverse;
 }
 
 //----------------------------------------------------------------------------------------
@@ -93,6 +97,8 @@ void MatrixStack::pop()
 	// 'Undo' the matrix by right multiplying the active transform by the inverse
 	active_transform = active_transform * m_inverse;
 
+	active_inverse = matrices.top() * active_inverse;
+
 	// We don't need it anymore
 	matrices.pop();
 }
@@ -101,14 +107,16 @@ void MatrixStack::pop()
 void MatrixStack::reset()
 {
 	matrices = std::stack<glm::mat4>();
+	inverses = std::stack<glm::mat4>();
 	active_transform = glm::mat4(1.0f);
+	active_inverse = glm::mat4(1.0f);
 }
 
 // A few helper functions for walking the scene graph and preparing the primitives.
 
-void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, std::list<glm::mat4> &scene_transforms, MatrixStack &ms);
+void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms);
 
-void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, std::list<glm::mat4> &scene_transforms, MatrixStack &ms)
+void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms)
 {
 	// First thing is to push the node's local transform 
 	ms.push(node.get_transform());	
@@ -135,8 +143,13 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, std::l
 			// I'm not sure if this is the best way to do this, we could alternatively walk
 			// the scene graph for every ray, avoiding having to store transformations.
 
-			scene_transforms.push_back(ms.active_transform);
+			SurfaceParams sp;
+			sp.trans = ms.active_transform;
+			sp.inv_trans = glm::inverse(ms.active_transform);
+
+			surface_parameters.push_back(sp);	
 			scene_surfaces.push_back(surface);
+
 			break;
 		}
 		case NodeType::SceneNode:
@@ -153,14 +166,14 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, std::l
 	// (make a copy first so we can safely modify the list in the mutual recursion)
 	
 	std::list<SceneNode *> children_copy = node.children;
-	processNodeList(children_copy, scene_surfaces, scene_transforms, ms);
+	processNodeList(children_copy, scene_surfaces, surface_parameters, ms);
 
 	// We have processed all of its node's children, so we can safely pop off the transformation
 	// local to this node
 	ms.pop();
 }
 
-void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, std::list<glm::mat4> &scene_transforms, MatrixStack &ms)
+void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms)
 {
 	if(nodes.empty()) {
 		return;
@@ -169,8 +182,8 @@ void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scen
 	SceneNode *first = nodes.front();
 	nodes.pop_front();
 
-	processNode(*first, scene_surfaces, scene_transforms, ms);
-	processNodeList(nodes, scene_surfaces, scene_transforms, ms);
+	processNode(*first, scene_surfaces, surface_parameters, ms);
+	processNodeList(nodes, scene_surfaces, surface_parameters, ms);
 }
 
 void printPercentDone(size_t current_col, size_t total_cols)
@@ -247,12 +260,12 @@ void A4_Render(
 
 	// Walk the scene graph and collect the surfaces with their corresponding transformations
 	std::list<Primitive *> scene_surfaces;
-	std::list<glm::mat4> scene_transforms;
+	std::list<SurfaceParams> surface_parameters;
 	MatrixStack ms{};
 
-	processNode(*root, scene_surfaces, scene_transforms, ms);
+	processNode(*root, scene_surfaces, surface_parameters, ms);
 
-	SurfaceGroup surfaces(scene_surfaces, scene_transforms);
+	SurfaceGroup surfaces(scene_surfaces, surface_parameters);
 
 
 #ifndef NDEBUG
@@ -319,7 +332,7 @@ void A4_Render(
 				// Also take into account ambient lighting, leave this as a simple computation for now.
 				// Ideally the factor multiplying the ambient intensity should be part of the material,
 				// but that requires some changes to the skeleton assignment code that I would like to leave for later
-				glm::vec3 colour = ambient * 0.5f;
+				glm::vec3 colour = ambient;
 
 				for ( const Light *light : lights )
 				{

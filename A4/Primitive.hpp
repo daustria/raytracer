@@ -20,6 +20,14 @@ struct HitRecord
 	// We may need more things like texture coordinates, later on
 };
 
+struct SurfaceParams
+{
+	glm::mat4 trans;
+	glm::mat4 inv_trans;
+
+	// Can also put name and material in here later
+};
+
 enum class PrimitiveType 
 {
 	None,
@@ -38,7 +46,7 @@ public:
 	
 	// Fill in the HitRecord hr with data about whether the ray r intersected this primitive
 	// in the interval (t_0, t_1)
-	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const glm::mat4 &m = glm::mat4(1.0f)) const;
+	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp = SurfaceParams()) const;
 
 	// Hit the untransformed object
 	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
@@ -107,10 +115,11 @@ private:
 // Convenience class for determining how a ray hits a group of surfaces...
 struct SurfaceGroup : public Primitive 
 {
-	SurfaceGroup(const std::list<Primitive *> & surfaces = {}, const std::list<glm::mat4> &transforms = {});
-	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
+	SurfaceGroup(const std::list<Primitive *> & surfaces = {}, const std::list<SurfaceParams> &params = {});
+
+	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
 	// Maybe we should also store material? And name? Perhaps just keep another bookkeeping class called PrimitiveParameters or something
 	std::list<Primitive *> m_surfaces; 
-	std::list<glm::mat4> m_transforms;
+	std::list<SurfaceParams> m_surfaceParams;
 };

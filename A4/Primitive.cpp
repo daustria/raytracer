@@ -33,9 +33,11 @@ void homogenize(glm::vec4 &v)
 	v.w = 1.0f;
 }
 
-void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const glm::mat4 &m) const
+void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp) const
 {
-	glm::mat4 inv = glm::inverse(m);
+	const glm::mat4 &m = sp.trans;
+	const glm::mat4 &inv = sp.inv_trans;
+
 	// First we construct the ray with the inverse transformation left-multiplied 
 	Ray r_t(r.o, r.d);
 	r_t.transform(inv);
@@ -278,29 +280,29 @@ NonhierBox::~NonhierBox()
 }
 
 // Surface Group ---------------------------------------------------------------------------------
-SurfaceGroup::SurfaceGroup(const std::list<Primitive *> & surfaces, const std::list<glm::mat4> &transforms) : 
-	m_surfaces(surfaces), m_transforms(transforms)
+SurfaceGroup::SurfaceGroup(const std::list<Primitive *> & surfaces, const std::list<SurfaceParams> &params) : 
+	m_surfaces(surfaces), m_surfaceParams(params)
 
 {
 	m_primitiveType = PrimitiveType::Group;
 }
 
-void SurfaceGroup::hit(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+void SurfaceGroup::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
-	assert(m_surfaces.size() == m_transforms.size());
+	assert(m_surfaces.size() == m_surfaceParams.size());
 
 	hr.miss = true;
 
 	std::list<Primitive *>::const_iterator i = m_surfaces.begin();
-	std::list<glm::mat4>::const_iterator j = m_transforms.begin();
+	std::list<SurfaceParams>::const_iterator j = m_surfaceParams.begin();
 
 	while (i != m_surfaces.end())
 	{
 		const Primitive *surface = *i;
-		const glm::mat4 &trans = *j;
+		const SurfaceParams &sp = *j;
 
 		HitRecord surface_hr;
-		surface->hit(surface_hr, r, t_0, t_1, trans);
+		surface->hit(surface_hr, r, t_0, t_1, *j);
 
 		// If we hit the surface, update the record of the closest hit and
 		// update the upper bound of our interval
