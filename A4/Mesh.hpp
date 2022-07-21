@@ -38,10 +38,10 @@ public:
 private:
 	void hitTriangle(HitRecord &hr, const Ray &r, float t_0, float t_1, const Triangle &tri) const;
 
+	friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
+
 	std::vector<glm::vec3> m_vertices;
 	std::vector<Triangle> m_faces;
-
-	friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
 
 	// Parameters for the bounding box of this mesh..
 	glm::vec3 m_bmin;

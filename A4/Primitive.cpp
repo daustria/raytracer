@@ -21,18 +21,6 @@ void Primitive::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) cons
 	return;
 }
 
-void homogenize(glm::vec4 &v)
-{
-	if (v.w == 0) {
-		return;
-	}
-
-	v.x = v.x/v.w;
-	v.y = v.y/v.w;
-	v.z = v.z/v.w;
-	v.w = 1.0f;
-}
-
 void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp) const
 {
 	const glm::mat4 &m = sp.trans;

@@ -336,7 +336,7 @@ void A4_Render(
 
 				for ( const Light *light : lights )
 				{
-					// What happens if we exceed 1.0 ? ..
+					// Note: if we exceed 1.0f here, it treats it like 1.0f
 					colour = colour + light->illuminate(r, hr);
 				}
 

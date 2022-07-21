@@ -22,9 +22,6 @@ static std::string getAssetFilePath(const std::string &fname)
 	return "Assets/"+fname;
 }
 
-// TODO:
-// For some reason, m_vertices and m_faces are turning out as zero vectors with nothing inside them.
-// Need to check if this code even works.
 Mesh::Mesh( const std::string& fname )
 	: m_vertices()
 	  , m_faces()
@@ -33,7 +30,7 @@ Mesh::Mesh( const std::string& fname )
 	std::string code;
 	double vx, vy, vz;
 	size_t s1, s2, s3;
-	static const float EPSILON(0.01f);
+	static const float EPSILON_MESH(0.01f);
 
 	bool first_vertex(true);
 
@@ -51,11 +48,11 @@ Mesh::Mesh( const std::string& fname )
 
 			if (first_vertex) {
 				// Initialize the min and max vertices for bounding box
-				m_bmin = v - glm::vec3(EPSILON);
-				m_bmax = v + glm::vec3(EPSILON);
+				m_bmin = v - glm::vec3(EPSILON_MESH);
+				m_bmax = v + glm::vec3(EPSILON_MESH);
 				first_vertex = false;
 			} else {
-				// Update the bounding box vertices
+				// Update the min and max vertices of the bounding box
 
 				for(int i = 0; i < 3; ++i) {
 					if (v[i] < m_bmin[i]) {
