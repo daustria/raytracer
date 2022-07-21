@@ -42,4 +42,10 @@ private:
 	std::vector<Triangle> m_faces;
 
 	friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
+
+	// Parameters for the bounding box of this mesh..
+	glm::vec3 m_bmin;
+	glm::vec3 m_bmax;
+	NonhierBox m_boundingBox;
+
 };

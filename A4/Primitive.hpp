@@ -92,9 +92,9 @@ private:
 class NonhierBox : public Primitive {
 public:
 	NonhierBox(const glm::vec3& pos, double size);
+	NonhierBox(const glm::vec3 &bmin, const glm::vec3 &bmax);
 
 	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
-
 
 	const glm::vec3 &bmin() const;
 	const glm::vec3 &bmax() const;
@@ -106,8 +106,6 @@ private:
 	// Given a point on the box, return the surface normal
 	glm::vec3 computeNormal(const glm::vec3 &) const;
 
-	glm::vec3 m_pos;
-	double m_size;
 	glm::vec3 m_min;
 	glm::vec3 m_max;
 };

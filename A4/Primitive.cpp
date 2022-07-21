@@ -174,7 +174,13 @@ void NonhierSphere::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) 
 
 // Nonhier Box --------------------------------------------------------------------
 NonhierBox::NonhierBox(const glm::vec3& pos, double size)
-	: m_pos(pos), m_size(size), m_min(m_pos), m_max(m_pos + glm::vec3(m_size))
+	: m_min(pos), m_max(pos + glm::vec3(size, size, size))
+{
+	m_primitiveType = PrimitiveType::NH_Box;
+}
+
+NonhierBox::NonhierBox(const glm::vec3& bmin, const glm::vec3 &bmax)
+	: m_min(bmin), m_max(bmax)
 {
 	m_primitiveType = PrimitiveType::NH_Box;
 }
@@ -224,7 +230,7 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 		hit_error = true;
 	}
 
-	return {0,0,0};
+	return {0,1.0f,0};
 
 }
 

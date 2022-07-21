@@ -331,8 +331,8 @@ void A4_Render(
 
 				// Also take into account ambient lighting, leave this as a simple computation for now.
 				// Ideally the factor multiplying the ambient intensity should be part of the material,
-				// but that requires some changes to the skeleton assignment code that I would like to leave for later
-				glm::vec3 colour = ambient;
+				// but that seems to requires some changes to the skeleton assignment code that I would like to leave for later.
+				glm::vec3 colour = ambient*0.8f;
 
 				for ( const Light *light : lights )
 				{

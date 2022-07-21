@@ -27,11 +27,15 @@ static std::string getAssetFilePath(const std::string &fname)
 // Need to check if this code even works.
 Mesh::Mesh( const std::string& fname )
 	: m_vertices()
-	, m_faces()
+	  , m_faces()
+	  , m_boundingBox(glm::vec3(), 1.0f)
 {
 	std::string code;
 	double vx, vy, vz;
 	size_t s1, s2, s3;
+	static const float EPSILON(0.01f);
+
+	bool first_vertex(true);
 
 	//std::ifstream ifs( fname.c_str() );
 	std::ifstream ifs( getAssetFilePath(fname).c_str() );
@@ -42,19 +46,53 @@ Mesh::Mesh( const std::string& fname )
 	while( ifs >> code ) {
 		if( code == "v" ) {
 			ifs >> vx >> vy >> vz;
-			m_vertices.push_back( glm::vec3( vx, vy, vz ) );
+			glm::vec3 v{vx, vy, vz};
+			m_vertices.push_back(v);
+
+			if (first_vertex) {
+				// Initialize the min and max vertices for bounding box
+				m_bmin = v - glm::vec3(EPSILON);
+				m_bmax = v + glm::vec3(EPSILON);
+				first_vertex = false;
+			} else {
+				// Update the bounding box vertices
+
+				for(int i = 0; i < 3; ++i) {
+					if (v[i] < m_bmin[i]) {
+						m_bmin[i] = v[i];
+					}
+
+					if (v[i] > m_bmax[i]) {
+						m_bmax[i] = v[i];
+					}
+				}
+			}
+
+
+
 		} else if( code == "f" ) {
 			ifs >> s1 >> s2 >> s3;
 			m_faces.push_back( Triangle( s1 - 1, s2 - 1, s3 - 1 ) );
+
 		}
 	}
 
+	m_boundingBox = NonhierBox(m_bmin, m_bmax - m_bmin);
 	m_primitiveType = PrimitiveType::Mesh;
 }
 
 void Mesh::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
-	// We follow the same logic as intersecting a group of surfaces,
+	// First we check if it hits our bounding box, to avoid 
+	// doing unnecessary work of intersecting with each triangle
+	
+	m_boundingBox.hit_base(hr, r, t_0, t_1);
+
+	if (hr.miss) {
+		return;
+	}
+		
+	// Now we follow the same logic as intersecting a group of surfaces,
 	// since a mesh can be thought of as a gorup of triangles.
 
 	hr.miss = true;
