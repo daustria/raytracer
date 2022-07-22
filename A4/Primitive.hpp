@@ -6,6 +6,7 @@
 #include <string>
 #include "Material.hpp"
 #include "Ray.hpp"
+#define RAY_DISTANCE_MAX 2000
 
 class Primitive; 
 
@@ -115,6 +116,7 @@ struct SurfaceGroup : public Primitive
 {
 	SurfaceGroup(const std::list<Primitive *> & surfaces = {}, const std::list<SurfaceParams> &params = {});
 
+	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp = SurfaceParams()) const override;
 	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
 	// Maybe we should also store material? And name? Perhaps just keep another bookkeeping class called PrimitiveParameters or something

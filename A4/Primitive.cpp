@@ -178,6 +178,8 @@ bool approx(float a, float b)
 	return abs(a - b) < EPSILON;
 }
 
+// TODO : I think this function is broken, need to fix, but not essential right now since
+// images seem to be rendering still
 glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 {
 	// The cube has 6 planes, each with a different normal (need it to point outside the surface)
@@ -309,6 +311,11 @@ void SurfaceGroup::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) c
 		++j;
 	}
 
+}
+
+void SurfaceGroup::hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp) const
+{
+	hit_base(hr, r, t_0, t_1);
 }
 
 std::ostream & operator << (std::ostream & os, const Primitive &p)

@@ -19,7 +19,7 @@ struct Light {
   // reflected light of the surface at the intersection point. Note that this
   // computation is carried out seperately for the red, green, and blue channels,
   // so we return a vec3
-  virtual glm::vec3 illuminate(const Ray &r, const HitRecord &hr) const;
+  virtual glm::vec3 illuminate(const Ray &r, const HitRecord &hr, const SurfaceGroup &surfaces) const;
 };
 
 std::ostream& operator<<(std::ostream& out, const Light& l);

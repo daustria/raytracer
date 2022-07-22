@@ -180,6 +180,7 @@ void Mesh::hitTriangle(HitRecord &hr, const Ray &r, float t_0, float t_1, const 
 
 	hr.miss = false;
 	hr.t = t;
+	hr.hit_point = r.evaluate(t);
 	hr.n = glm::normalize(glm::cross(b_tri - a_tri, c_tri - a_tri));
 	// We'll set the primitive pointer as the mesh outside this helper function
 }

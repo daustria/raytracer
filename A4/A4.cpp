@@ -11,7 +11,6 @@
 #define PLANE_WIDTH 100
 #define PLANE_HEIGHT 100
 #define PLANE_DISTANCE 100
-#define RAY_DISTANCE 2000
 
 // Ray --------------------------------------------------------------------------
 Ray::Ray(const glm::vec3 &origin, const glm::vec3 &direction) 
@@ -114,9 +113,9 @@ void MatrixStack::reset()
 
 // A few helper functions for walking the scene graph and preparing the primitives.
 
-void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms);
+void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_primitives, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms);
 
-void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms)
+void processNode(SceneNode &node, std::list<Primitive *> &scene_primitives, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms)
 {
 	// First thing is to push the node's local transform 
 	ms.push(node.get_transform());	
@@ -148,7 +147,7 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, std::l
 			sp.inv_trans = glm::inverse(ms.active_transform);
 
 			surface_parameters.push_back(sp);	
-			scene_surfaces.push_back(surface);
+			scene_primitives.push_back(surface);
 
 			break;
 		}
@@ -166,14 +165,14 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_surfaces, std::l
 	// (make a copy first so we can safely modify the list in the mutual recursion)
 	
 	std::list<SceneNode *> children_copy = node.children;
-	processNodeList(children_copy, scene_surfaces, surface_parameters, ms);
+	processNodeList(children_copy, scene_primitives, surface_parameters, ms);
 
 	// We have processed all of its node's children, so we can safely pop off the transformation
 	// local to this node
 	ms.pop();
 }
 
-void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_surfaces, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms)
+void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_primitives, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms)
 {
 	if(nodes.empty()) {
 		return;
@@ -182,8 +181,8 @@ void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scen
 	SceneNode *first = nodes.front();
 	nodes.pop_front();
 
-	processNode(*first, scene_surfaces, surface_parameters, ms);
-	processNodeList(nodes, scene_surfaces, surface_parameters, ms);
+	processNode(*first, scene_primitives, surface_parameters, ms);
+	processNodeList(nodes, scene_primitives, surface_parameters, ms);
 }
 
 void printPercentDone(size_t current_col, size_t total_cols)
@@ -259,13 +258,13 @@ void A4_Render(
 	size_t w = image.width();
 
 	// Walk the scene graph and collect the surfaces with their corresponding transformations
-	std::list<Primitive *> scene_surfaces;
+	std::list<Primitive *> scene_primitives;
 	std::list<SurfaceParams> surface_parameters;
 	MatrixStack ms{};
 
-	processNode(*root, scene_surfaces, surface_parameters, ms);
+	processNode(*root, scene_primitives, surface_parameters, ms);
 
-	SurfaceGroup surfaces(scene_surfaces, surface_parameters);
+	SurfaceGroup surfaces(scene_primitives, surface_parameters);
 
 
 #ifndef NDEBUG
@@ -309,7 +308,7 @@ void A4_Render(
 			HitRecord hr;
 
 			// Intersect the ray with all the surfaces
-			surfaces.hit(hr, r, 0, RAY_DISTANCE);
+			surfaces.hit(hr, r, 0, RAY_DISTANCE_MAX);
 			
 			// some debugging code.. i just change x and y to be the pixels i want
 			if ( x == 250 && y == 250 ) {
@@ -332,12 +331,14 @@ void A4_Render(
 				// Also take into account ambient lighting, leave this as a simple computation for now.
 				// Ideally the factor multiplying the ambient intensity should be part of the material,
 				// but that seems to requires some changes to the skeleton assignment code that I would like to leave for later.
-				glm::vec3 colour = ambient*0.8f;
+
+				static const float K_AMBIENT(0.8f);
+				glm::vec3 colour = ambient*K_AMBIENT;
 
 				for ( const Light *light : lights )
 				{
 					// Note: if we exceed 1.0f here, it treats it like 1.0f
-					colour = colour + light->illuminate(r, hr);
+					colour = colour + light->illuminate(r, hr, surfaces);
 				}
 
 				image(x, y, 0) = (double) colour.r;
