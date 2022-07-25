@@ -10,23 +10,25 @@
 
 class Primitive; 
 
+struct SurfaceParams
+{
+	glm::mat4 trans;
+	glm::mat4 inv_trans;
+	Material *material;
+	std::string name;
+	// May also put something like texture ?
+};
+
 struct HitRecord 
 {
-	const Primitive *p; // surface that was hit
+	const Primitive *p; // Primitive that was hit
+	const SurfaceParams *params; // Paramters of the surface (material, transfomrations, etc)
 	float t; // parameter of the ray where the intersection happened
 	bool miss; // Whether the ray actually hit the surface or not
 	glm::vec3 n; // Normal of surface at the intersection point
 	glm::vec3 hit_point; // point on the surface that was hit 
 
 	// We may need more things like texture coordinates, later on
-};
-
-struct SurfaceParams
-{
-	glm::mat4 trans;
-	glm::mat4 inv_trans;
-
-	// Can also put name and material in here later
 };
 
 enum class PrimitiveType 
@@ -53,16 +55,10 @@ public:
 	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
 
 	PrimitiveType m_primitiveType;	
-
-	Material *m_material; 
-
-	std::string m_name; // Corresponds to the name of the geometry node where we got the material from
 	
 	friend std::ostream & operator << (std::ostream &, const Primitive &);
 
 };
-
-void transformVector(glm::vec3 &vertex, const glm::mat4 &transform);
 
 class Sphere : public Primitive {
 public:
