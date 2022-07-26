@@ -4,7 +4,7 @@
 
 static const float EPSILON = 0.01f;
 
-Primitive::Primitive() : m_primitiveType(PrimitiveType::None), m_material(nullptr)
+Primitive::Primitive() : m_primitiveType(PrimitiveType::None)
 {
 
 }
@@ -13,40 +13,12 @@ Primitive::~Primitive()
 {
 }
 
-void Primitive::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+void Primitive::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	// Default behaviour is just to return a miss
 	hr.p = this;
 	hr.miss = true;
 	return;
-}
-
-void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp) const
-{
-	const glm::mat4 &m = sp.trans;
-	const glm::mat4 &inv = sp.inv_trans;
-
-	// First we construct the ray with the inverse transformation left-multiplied 
-	Ray r_t(r.o, r.d);
-	r_t.transform(inv);
-
-	// Now hit the base object with the transformed ray	
-	hit_base(hr, r_t, t_0, t_1);
-
-	if (!hr.miss) {
-		// Get the matrix for transforming normals
-		glm::mat3 normalTransform = glm::mat3(glm::transpose(inv));
-		hr.n = glm::normalize(normalTransform * hr.n);
-
-		// Transform the intersection point also 
-		transformVector(hr.hit_point, m);
-
-		// The nice thing is we do not need to change hr.t .
-	} else {
-		// we did not hit the base object with the transformed ray.
-		// so we say that the ray did not hit the transformed object.
-		hr.miss = true;
-	}
 }
 
 void transformVector(glm::vec3 &v, const glm::mat4 &m) 
@@ -62,6 +34,43 @@ void transformVector(glm::vec3 &v, const glm::mat4 &m)
 	v = glm::vec3{u.x/u.w, u.y/u.w, u.z/u.w};
 }
 
+void Primitive::hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp) const
+{
+	const glm::mat4 &m = sp.trans;
+	const glm::mat4 &inv = sp.inv_trans;
+
+	// First we construct the ray with the inverse transformation left-multiplied 
+	Ray r_t(r.o, r.d);
+	r_t.transform(inv);
+
+	// Now hit the base object with the transformed ray	
+	hitBase(hr, r_t, t_0, t_1);
+
+	if (!hr.miss) {
+		// Get the matrix for transforming normals
+		glm::mat3 normalTransform = glm::mat3(glm::transpose(inv));
+		hr.n = glm::normalize(normalTransform * hr.n);
+
+		// Transform the intersection point also 
+		transformVector(hr.hit_point, m);
+
+		hr.params = &sp;
+
+		updateTextureCoordinates(hr);
+
+		// The nice thing is we do not need to change hr.t .
+	} else {
+		// we did not hit the base object with the transformed ray.
+		// so we say that the ray did not hit the transformed object.
+		hr.miss = true;
+	}
+}
+
+void Primitive::updateTextureCoordinates(HitRecord &hr) const
+{
+	hr.u = 0.0;
+	hr.v = 0.0;
+}
 
 // Sphere ----------------------------------------------------------------------------
 Sphere::~Sphere()
@@ -87,7 +96,7 @@ NonhierSphere::~NonhierSphere()
 }
 
 
-void NonhierSphere::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+void NonhierSphere::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	hr.miss = false;
 
@@ -224,7 +233,7 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 
 }
 
-void NonhierBox::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const 
+void NonhierBox::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const 
 {
 	// Implementation of box primitives seems difficult and not much
 	// official resources. I think I'll just leave box as triangle meshes
@@ -283,7 +292,7 @@ SurfaceGroup::SurfaceGroup(const std::list<Primitive *> & surfaces, const std::l
 	m_primitiveType = PrimitiveType::Group;
 }
 
-void SurfaceGroup::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+void SurfaceGroup::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	assert(m_surfaces.size() == m_surfaceParams.size());
 
@@ -315,13 +324,13 @@ void SurfaceGroup::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) c
 
 void SurfaceGroup::hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp) const
 {
-	hit_base(hr, r, t_0, t_1);
+	hitBase(hr, r, t_0, t_1);
 }
 
 std::ostream & operator << (std::ostream & os, const Primitive &p)
 {
 	char buffer[100]; // For string formatting
-	os << "NAME:" << p.m_name << std::endl;
+
 	switch(p.m_primitiveType)
 	{
 		case PrimitiveType::None:

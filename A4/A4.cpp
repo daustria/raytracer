@@ -133,16 +133,9 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_primitives, std:
 			// or I make a new Primitive.
 			Primitive *surface = geometryNode->m_primitive;
 
-			// This code here should probably altered slightly since now we know that primitive pointers are shared, and
-			// our work here could be overwritten
-			surface->m_material = geometryNode->m_material;
-			surface->m_name = geometryNode->m_name;
-
-			// Store the transformations right into the primitives.
-			// I'm not sure if this is the best way to do this, we could alternatively walk
-			// the scene graph for every ray, avoiding having to store transformations.
-
 			SurfaceParams sp;
+			sp.material = geometryNode->m_material;
+			sp.name = geometryNode->m_name;
 			sp.trans = ms.active_transform;
 			sp.inv_trans = glm::inverse(ms.active_transform);
 
@@ -315,15 +308,12 @@ void A4_Render(
 				//printf("HERE\n");
 			}
 
-			// Primitive *front = surfaces.m_surfaces.front();
-			// front->hit(hr, r, 0, RAY_DISTANCE);
-
 			if (hr.miss) {
-				// We missed. Just colour it black
+				// We missed, so colour the background colour
 
-				image(x, y, 0) = 0.3f;
-				image(x, y, 1) = 0.3f;
-				image(x, y, 2) = 1.0f;
+				image(x, y, 0) = 0.0f;
+				image(x, y, 1) = 0.8f;
+				image(x, y, 2) = 0.95f;
 			} else {
 				// Compute the colour of the pixel, taking into account
 				// the various point-light sources

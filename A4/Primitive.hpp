@@ -28,7 +28,10 @@ struct HitRecord
 	glm::vec3 n; // Normal of surface at the intersection point
 	glm::vec3 hit_point; // point on the surface that was hit 
 
-	// We may need more things like texture coordinates, later on
+	// Texture coordinates
+	double u;
+	double v;
+
 };
 
 enum class PrimitiveType 
@@ -52,7 +55,9 @@ public:
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp = SurfaceParams()) const;
 
 	// Hit the untransformed object
-	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
+	virtual void hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const;
+
+	virtual void updateTextureCoordinates(HitRecord &hr) const;
 
 	PrimitiveType m_primitiveType;	
 	
@@ -76,7 +81,7 @@ public:
 	NonhierSphere(const glm::vec3& pos, double radius);
 	virtual ~NonhierSphere();
 
-	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
+	virtual void hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
 	const glm::vec3 &pos;
 	const double &r;
@@ -91,7 +96,7 @@ public:
 	NonhierBox(const glm::vec3& pos, double size);
 	NonhierBox(const glm::vec3 &bmin, const glm::vec3 &bmax);
 
-	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
+	virtual void hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
 	const glm::vec3 &bmin() const;
 	const glm::vec3 &bmax() const;
@@ -113,7 +118,7 @@ struct SurfaceGroup : public Primitive
 	SurfaceGroup(const std::list<Primitive *> & surfaces = {}, const std::list<SurfaceParams> &params = {});
 
 	virtual void hit(HitRecord &hr, const Ray &r, float t_0, float t_1, const SurfaceParams &sp = SurfaceParams()) const override;
-	virtual void hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
+	virtual void hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
 
 	// Maybe we should also store material? And name? Perhaps just keep another bookkeeping class called PrimitiveParameters or something
 	std::list<Primitive *> m_surfaces; 

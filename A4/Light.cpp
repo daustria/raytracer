@@ -43,7 +43,6 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGrou
 		return {0,0,0};
 	}
 
-
 	glm::vec3 n = hr.n; //surface normal, we assume this to be normalized already
 
 	// irradiance, describing the amount of radiant power per unit area.
@@ -59,7 +58,7 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGrou
 
 	// The bidirectional reflectance distrubution function, or BRDF describes how the
 	// reflectance varies as functions of l and v. 
-	glm::vec3 k = hr.p->m_material->evaluate(l,v,n); 
+	glm::vec3 k = hr.params->material->evaluate(l,v,n); 
 
 	// The amount of reflected light is computed seperately for
 	// the red, green, and blue channels.

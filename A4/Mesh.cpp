@@ -1,12 +1,9 @@
 #include <iostream>
 #include <fstream>
-
 #include <glm/ext.hpp>
 
 // #include "cs488-framework/ObjFileDecoder.hpp"
 #include "Mesh.hpp"
-
-
 
 static std::string getAssetFilePath(const std::string &fname) 
 {
@@ -28,20 +25,20 @@ Mesh::Mesh( const std::string& fname )
 	  , m_boundingBox(glm::vec3(), 1.0f)
 {
 	std::string code;
-	double vx, vy, vz;
-	size_t s1, s2, s3;
+
 	static const float EPSILON_MESH(0.01f);
 
 	bool first_vertex(true);
 
 	//std::ifstream ifs( fname.c_str() );
 	std::ifstream ifs( getAssetFilePath(fname).c_str() );
-
-	// Note: if we want to put textures (which I definitely do) we will
-	// have to modify this code.. and probably other places as well
 	
 	while( ifs >> code ) {
+
 		if( code == "v" ) {
+
+			double vx, vy, vz;
+
 			ifs >> vx >> vy >> vz;
 			glm::vec3 v{vx, vy, vz};
 			m_vertices.push_back(v);
@@ -65,25 +62,126 @@ Mesh::Mesh( const std::string& fname )
 				}
 			}
 
+		} else if ( code == "vn" ) {
 
+			double n1, n2, n3;
+			ifs >> n1 >> n2 >> n3;
+			glm::vec3 n{n1, n2, n3};
+
+			m_normals.push_back(n);
+
+		} else if (code == "vt" ) {
+
+			double u, v;
+			ifs >> u >> v;
+
+			glm::dvec2 t{u, v};
+
+			m_textureCoordinates.push_back(t);
 
 		} else if( code == "f" ) {
-			ifs >> s1 >> s2 >> s3;
-			m_faces.push_back( Triangle( s1 - 1, s2 - 1, s3 - 1 ) );
 
+			std::string currentLine;
+			std::getline(ifs, currentLine);
+
+			// The code for this function is simple but a bit long and tedious so I just 
+			// moved it to this helper function
+			readFaceIndices(currentLine);
+
+		} else {
+
+			printf(" %s | ERROR : Unknown code in reading Mesh file\n", __func__);
+
+			// Advance past the current line and continue as normal
+			std::string currentLine;
+			std::getline(ifs, currentLine);
+
+			continue;
 		}
+
 	}
 
 	m_boundingBox = NonhierBox(m_bmin, m_bmax - m_bmin);
 	m_primitiveType = PrimitiveType::Mesh;
 }
 
-void Mesh::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
+void Mesh::readFaceIndices(const std::string & currentLine)
+{
+	int positionIndexA, positionIndexB, positionIndexC;
+	int normalIndexA, normalIndexB, normalIndexC;
+	int uvCoordIndexA, uvCoordIndexB, uvCoordIndexC;
+
+	int index;
+
+	// sscanf will return the number of matched index values it found
+	// from the pattern.
+
+	int matches_type_a = sscanf(currentLine.c_str(), " %d/%d/%d", &index, &index, &index);
+	int matches_type_b = sscanf(currentLine.c_str(), " %d//%d", &index, &index);
+	int matches_type_c = sscanf(currentLine.c_str(), " %d %d %d", &index, &index, &index);
+
+	if ( matches_type_a == 3 ) {
+
+		// Line contains indices of the pattern vertex/uv-cord/normal.
+		sscanf(currentLine.c_str(), " %d/%d/%d %d/%d/%d %d/%d/%d",
+				&positionIndexA, &uvCoordIndexA, &normalIndexA,
+				&positionIndexB, &uvCoordIndexB, &normalIndexB,
+				&positionIndexC, &uvCoordIndexC, &normalIndexC);
+
+		// .obj file uses indices that start at 1, so subtract 1 so they start at 0.
+		positionIndexA--;
+		positionIndexB--;
+		positionIndexC--;
+		uvCoordIndexA--;
+		uvCoordIndexB--;
+		uvCoordIndexC--;
+		normalIndexA--;
+		normalIndexB--;
+		normalIndexC--;
+
+		m_faces.push_back( Triangle( positionIndexA, positionIndexB, positionIndexC, 
+					uvCoordIndexA, uvCoordIndexB, uvCoordIndexC, 
+					normalIndexA, normalIndexB, normalIndexC ) );
+
+	} else if ( matches_type_b == 2) {
+
+		// Line contains indices of the pattern vertex//normal.
+		sscanf(currentLine.c_str(), " %d//%d %d//%d %d//%d",
+				&positionIndexA, &normalIndexA,
+				&positionIndexB, &normalIndexB,
+				&positionIndexC, &normalIndexC);
+
+		positionIndexA--;
+		positionIndexB--;
+		positionIndexC--;
+		normalIndexA--;
+		normalIndexB--;
+		normalIndexC--;
+
+		m_faces.push_back( Triangle( positionIndexA, positionIndexB, positionIndexC,
+					normalIndexA, normalIndexB, normalIndexC ) );
+
+
+	} else if ( matches_type_c == 3 ) {
+
+		// Regular pattern of 'vertex vertex vertex', no normals and texture coordinates
+
+		sscanf(currentLine.c_str(), " %d %d %d", &positionIndexA, &positionIndexB, &positionIndexC);
+
+		positionIndexA--;
+		positionIndexB--;
+		positionIndexC--;
+
+		m_faces.push_back( Triangle( positionIndexA, positionIndexB, positionIndexC ) );
+	}
+}
+
+void Mesh::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
 	// First we check if it hits our bounding box, to avoid 
 	// doing unnecessary work of intersecting with each triangle
 	
-	m_boundingBox.hit_base(hr, r, t_0, t_1);
+	m_boundingBox.hitBase(hr, r, t_0, t_1);
 
 	if (hr.miss) {
 		return;
@@ -94,6 +192,8 @@ void Mesh::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 
 	hr.miss = true;
 
+	const Triangle *hit_face = nullptr;
+
 	for (const Triangle &face : m_faces) 
 	{
 		HitRecord rec;
@@ -103,7 +203,13 @@ void Mesh::hit_base(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 		if (!rec.miss) {
 			hr = rec;
 			t_1 = rec.t;
+			hit_face = &face;
 		}	
+	}
+
+	// If we hit a triangle, update the texture coordinates
+	if (!hr.miss && hit_face) {
+		updateTextureCoordinatesTriangle(hr, *hit_face);
 	}
 
 	hr.p = this;
@@ -183,6 +289,14 @@ void Mesh::hitTriangle(HitRecord &hr, const Ray &r, float t_0, float t_1, const 
 	hr.hit_point = r.evaluate(t);
 	hr.n = glm::normalize(glm::cross(b_tri - a_tri, c_tri - a_tri));
 	// We'll set the primitive pointer as the mesh outside this helper function
+}
+void Mesh::updateTextureCoordinates(HitRecord &hr) const 
+{
+	// Do nothing. We update texture coordinates already in our hitBase routine
+}
+void Mesh::updateTextureCoordinatesTriangle(HitRecord &hr, const Triangle &t) const
+{
+	// Do nothing, for now, since we haven't tried loading UV coordinates for meshes yet
 }
 
 std::ostream& operator<<(std::ostream& out, const Mesh& mesh)
