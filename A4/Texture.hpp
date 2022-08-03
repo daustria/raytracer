@@ -1,7 +1,7 @@
 #ifndef _TEXTURE_H_
 #define _TEXTURE_H_
 #include <glm/glm.hpp>
-#include "A4_stb_image.h"
+#include <string>
 
 class Texture
 {
@@ -17,7 +17,7 @@ public:
 
 	ImageTexture();
 
-	ImageTexture(const char* filename);
+	ImageTexture(const std::string &filename);
 
 	~ImageTexture();
 

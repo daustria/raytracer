@@ -16,7 +16,6 @@ struct SurfaceParams
 	glm::mat4 inv_trans;
 	Material *material;
 	std::string name;
-	// May also put something like texture ?
 };
 
 struct HitRecord 
@@ -28,10 +27,9 @@ struct HitRecord
 	glm::vec3 n; // Normal of surface at the intersection point
 	glm::vec3 hit_point; // point on the surface that was hit 
 
-	// Texture coordinates
+	// Texture coordinates of the hit point
 	double u;
 	double v;
-
 };
 
 enum class PrimitiveType 

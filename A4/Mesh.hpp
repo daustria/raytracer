@@ -41,12 +41,17 @@ struct Triangle
 		  , u1( u1 )
 		  , u2( u2 )
 		  , u3( u3 )
-	{}
+	{
+	
+	}
+
+	Triangle() {}
 
 };
 
 // A polygonal mesh.
-class Mesh : public Primitive {
+class Mesh : public Primitive 
+{
 public:
 	Mesh( const std::string& fname );
 
@@ -57,6 +62,8 @@ private:
 	void updateTextureCoordinatesTriangle(HitRecord &hr, const Triangle &t) const;
 
 	void readFaceIndices(const std::string & data);
+
+	void printDebugInfo() const;
 
 	friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
 
@@ -69,6 +76,5 @@ private:
 	glm::vec3 m_bmin;
 	glm::vec3 m_bmax;
 	NonhierBox m_boundingBox;
-
 
 };

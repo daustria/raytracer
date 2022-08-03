@@ -374,6 +374,26 @@ int gr_material_cmd(lua_State* L)
   return 1;
 }
 
+// Create a material from a mtl file
+extern "C"
+int gr_material_texture_cmd(lua_State* L)
+{
+	GRLUA_DEBUG_CALL;
+	gr_material_ud* data = (gr_material_ud*)lua_newuserdata(L, sizeof(gr_material_ud));
+	data->material = 0;
+
+	const char* mtl_fname = luaL_checkstring(L, 1);
+
+	std::string sfname(mtl_fname);
+
+	data->material = new PhongMaterial(sfname);
+
+	luaL_newmetatable(L, "gr.material");
+	lua_setmetatable(L, -2);
+
+	return 1;
+}
+
 // Add a Child to a node
 extern "C"
 int gr_node_add_child_cmd(lua_State* L)
@@ -517,6 +537,8 @@ static const luaL_Reg grlib_functions[] = {
   {"sphere", gr_sphere_cmd},
   {"joint", gr_joint_cmd},
   {"material", gr_material_cmd},
+  // I made this -Dominic
+  {"material_texture", gr_material_texture_cmd},
   // New for assignment 4
   {"cube", gr_cube_cmd},
   {"nh_sphere", gr_nh_sphere_cmd},

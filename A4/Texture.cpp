@@ -1,4 +1,5 @@
 #include <iostream>
+#include "A4_stb_image.h"
 #include "Texture.hpp"
 
 
@@ -10,14 +11,14 @@ ImageTexture::ImageTexture() : m_data(nullptr), m_width(0), m_height(0), bytes_p
 }
 
 
-ImageTexture::ImageTexture(const char *filename)
+ImageTexture::ImageTexture(const std::string &filename)
 {
 	int components_per_pixel = bytes_per_pixel;
 
-	m_data = stbi_load(filename, &m_width, &m_height, &components_per_pixel, components_per_pixel);
+	m_data = stbi_load(filename.c_str(), &m_width, &m_height, &components_per_pixel, components_per_pixel);
 
 	if (!m_data) {
-		std::cerr << " Could not load texture image file " << filename << std::endl;
+		printf(" %s | ERROR : Could not load texture image file %s\n", __func__, filename.c_str());
 		m_width = 0;
 		m_height = 0;
 	}
@@ -58,7 +59,9 @@ glm::vec3 ImageTexture::value(double u, double v, const glm::vec3 &p) const
 
 	unsigned char *pixel = m_data + j*bytes_per_scanline + i*bytes_per_pixel;
 	glm::vec3 colour{pixel[0], pixel[1], pixel[2]};
+
 	colour = (1/255.0f) * colour;
+
 	return colour;
 }
 

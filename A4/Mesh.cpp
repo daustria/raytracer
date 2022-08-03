@@ -5,6 +5,28 @@
 // #include "cs488-framework/ObjFileDecoder.hpp"
 #include "Mesh.hpp"
 
+
+void Mesh::printDebugInfo() const
+{
+	std::cout << "===========TRIANGLES==========" << std::endl;
+
+	for (const Triangle &t : m_faces)
+	{
+		printf("=======================================================\n");
+		glm::vec3 v = m_vertices[t.v1];
+		glm::dvec2 uv = m_textureCoordinates[t.u1];
+		printf("Vertex A: {%.2f,%.2f,%.2f,%.2f,%.2f}\n", v.x, v.y, v.z, uv[0], uv[1]);
+		printf("================================================\n");
+		v = m_vertices[t.v2];
+		uv = m_textureCoordinates[t.u2];
+		printf("Vertex B: {%.2f,%.2f,%.2f,%.2f,%.2f}\n", v.x, v.y, v.z, uv[0], uv[1]);
+		printf("================================================\n");
+		v = m_vertices[t.v3];
+		uv = m_textureCoordinates[t.u3];
+		printf("Vertex C: {%.2f,%.2f,%.2f,%.2f,%.2f}\n", v.x, v.y, v.z, uv[0], uv[1]);
+	}
+
+}
 static std::string getAssetFilePath(const std::string &fname) 
 {
 
@@ -90,8 +112,7 @@ Mesh::Mesh( const std::string& fname )
 
 		} else {
 
-			printf(" %s | ERROR : Unknown code in reading Mesh file\n", __func__);
-
+			printf(" %s | Skipping code %s in reading Mesh file %s\n", __func__, code.c_str(), fname.c_str());
 			// Advance past the current line and continue as normal
 			std::string currentLine;
 			std::getline(ifs, currentLine);
@@ -103,6 +124,8 @@ Mesh::Mesh( const std::string& fname )
 
 	m_boundingBox = NonhierBox(m_bmin, m_bmax - m_bmin);
 	m_primitiveType = PrimitiveType::Mesh;
+
+	// printDebugInfo();
 }
 
 void Mesh::readFaceIndices(const std::string & currentLine)
@@ -119,6 +142,7 @@ void Mesh::readFaceIndices(const std::string & currentLine)
 	int matches_type_a = sscanf(currentLine.c_str(), " %d/%d/%d", &index, &index, &index);
 	int matches_type_b = sscanf(currentLine.c_str(), " %d//%d", &index, &index);
 	int matches_type_c = sscanf(currentLine.c_str(), " %d %d %d", &index, &index, &index);
+	int matches_type_d = sscanf(currentLine.c_str(), " %d/%d", &index, &index);
 
 	if ( matches_type_a == 3 ) {
 
@@ -140,8 +164,8 @@ void Mesh::readFaceIndices(const std::string & currentLine)
 		normalIndexC--;
 
 		m_faces.push_back( Triangle( positionIndexA, positionIndexB, positionIndexC, 
-					uvCoordIndexA, uvCoordIndexB, uvCoordIndexC, 
-					normalIndexA, normalIndexB, normalIndexC ) );
+					normalIndexA, normalIndexB, normalIndexC, 
+					uvCoordIndexA, uvCoordIndexB, uvCoordIndexC));
 
 	} else if ( matches_type_b == 2) {
 
@@ -173,6 +197,24 @@ void Mesh::readFaceIndices(const std::string & currentLine)
 		positionIndexC--;
 
 		m_faces.push_back( Triangle( positionIndexA, positionIndexB, positionIndexC ) );
+	} else if ( matches_type_d == 2 ) {
+		// Line contains indices of the pattern vertex/uv-coords
+		sscanf(currentLine.c_str(), " %d/%d %d/%d %d/%d",
+				&positionIndexA, &uvCoordIndexA,
+				&positionIndexB, &uvCoordIndexB,
+				&positionIndexC, &uvCoordIndexC);
+
+		positionIndexA--;
+		positionIndexB--;
+		positionIndexC--;
+		uvCoordIndexA--;
+		uvCoordIndexB--;
+		uvCoordIndexC--;
+
+		m_faces.push_back( Triangle( positionIndexA, positionIndexB, positionIndexC,
+					0, 0, 0,
+					uvCoordIndexA, uvCoordIndexB, uvCoordIndexC));
+
 	}
 }
 
@@ -287,7 +329,16 @@ void Mesh::hitTriangle(HitRecord &hr, const Ray &r, float t_0, float t_1, const 
 	hr.miss = false;
 	hr.t = t;
 	hr.hit_point = r.evaluate(t);
-	hr.n = glm::normalize(glm::cross(b_tri - a_tri, c_tri - a_tri));
+	hr.n = glm::normalize(glm::cross(b_tri - a_tri, c_tri - a_tri)); 
+
+	/*
+	if (glm::dot(hr.n, r.d) > 0) {
+		// Note: this normal could point inside or outside the mesh, I have no clue (it depends on how
+		// the order of the triangle vertices in the .obj file)
+		hr.n = -hr.n;
+	}
+	*/
+
 	// We'll set the primitive pointer as the mesh outside this helper function
 }
 void Mesh::updateTextureCoordinates(HitRecord &hr) const 
@@ -296,7 +347,58 @@ void Mesh::updateTextureCoordinates(HitRecord &hr) const
 }
 void Mesh::updateTextureCoordinatesTriangle(HitRecord &hr, const Triangle &t) const
 {
-	// Do nothing, for now, since we haven't tried loading UV coordinates for meshes yet
+	// If this mesh does not have texture coordinates then there is nothing to be done
+	if (m_textureCoordinates.size() == 0) {
+		return;
+	}
+
+	// These are the vertices of the triangle.
+	glm::vec3 a = m_vertices[t.v1];
+	glm::vec3 b = m_vertices[t.v2];
+	glm::vec3 c = m_vertices[t.v3];
+
+	// Now we would like to know the barycentric coordinates of the point that we hit, which is..
+	const glm::vec3 &p = hr.hit_point;	
+
+	// First we compute gamma. These formulas are taken from 'Fundamentals of Computer Graphics'
+
+	// Note: I don't think these computations need to be very efficient since this is not a function
+	// that will be called often, at least for my own personal use of it
+	
+	
+	glm::vec3 n = glm::cross(b-a, c-a);
+	glm::vec3 n_a = glm::cross(c-b, p-b);
+	glm::vec3 n_b = glm::cross(a-c, p-c);
+	glm::vec3 n_c = glm::cross(b-a, p-a);
+
+	double gamma = glm::dot(n, n_c) / glm::length2(n);
+
+	if (abs(gamma) < 0 || gamma > 1.0) {
+		printf(" %s | ERROR: gamma:%.2f out of bounds \n", __func__, gamma);
+		abort();
+	}
+
+	double beta = glm::dot(n, n_b) / glm::length2(n);
+
+	if (abs(beta) < 0 || beta > 1.0) {
+		printf(" %s | ERROR: beta:%.2f out of bounds \n", __func__, beta);
+		abort();
+	}
+
+	double alpha = 1 - beta - gamma;
+
+
+	// Now get the texture coordinates of each vertex of the triangle.
+	glm::dvec2 a_uv = m_textureCoordinates[t.u1];
+	glm::dvec2 b_uv = m_textureCoordinates[t.u2];
+	glm::dvec2 c_uv = m_textureCoordinates[t.u3];
+
+	// The texture coordinates of the hit point is...
+	glm::dvec2 uv_coords = alpha*a_uv + beta*b_uv + gamma*c_uv;
+	hr.u = uv_coords[0];
+	hr.v = uv_coords[1];
+
+	// printf("%s | uv: {%.2f, %.2f}\n", __func__, hr.u, hr.v);
 }
 
 std::ostream& operator<<(std::ostream& out, const Mesh& mesh)
