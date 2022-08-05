@@ -120,7 +120,7 @@ glm::vec3 PhongMaterial::evaluate(const glm::vec3 &l, const glm::vec3 &v, const 
 	glm::vec3 h = glm::normalize(l+v);
 
 	float pi_inv = (float) 1/M_PI;
-	
+
 	glm::vec3 colour = kd*pi_inv + m_ks * (float) glm::pow( std::fmax(0, glm::dot(n,h)), m_ns );
 
 	if (m_texture) {

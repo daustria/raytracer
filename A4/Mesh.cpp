@@ -331,13 +331,14 @@ void Mesh::hitTriangle(HitRecord &hr, const Ray &r, float t_0, float t_1, const 
 	hr.hit_point = r.evaluate(t);
 	hr.n = glm::normalize(glm::cross(b_tri - a_tri, c_tri - a_tri)); 
 
-	/*
+
 	if (glm::dot(hr.n, r.d) > 0) {
-		// Note: this normal could point inside or outside the mesh, I have no clue (it depends on how
-		// the order of the triangle vertices in the .obj file)
+		// Choose the normal that is in the opposite direction of the viewing ray.
+		// Sometimes .obj files have faces with vertices not ordered consistently 
+		// (some faces clockwise and some faces counter clockwise) so I need this line to make
+		// the lighting work properly
 		hr.n = -hr.n;
 	}
-	*/
 
 	// We'll set the primitive pointer as the mesh outside this helper function
 }
