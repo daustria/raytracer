@@ -4,7 +4,7 @@
 #include <iostream>
 #include <list>
 #include <string>
-#include "Material.hpp"
+#include "PhongMaterial.hpp"
 #include "Ray.hpp"
 #define RAY_DISTANCE_MAX 2000
 
@@ -14,7 +14,7 @@ struct SurfaceParams
 {
 	glm::mat4 trans;
 	glm::mat4 inv_trans;
-	Material *material;
+	PhongMaterial *material;
 	std::string name;
 };
 

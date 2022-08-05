@@ -28,6 +28,7 @@ std::ostream& operator<<(std::ostream& out, const Light& l)
 glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGroup &surfaces) const
 {
 	static const float SHADOW_EPSILON(1.0f);
+	static const int MAX_DEPTH = 10;
 
 	glm::vec3 x = hr.hit_point;
 	glm::vec3 l = glm::normalize(position - x); // light direction
@@ -73,6 +74,9 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGrou
 	// reflectance varies as functions of l and v. 
 	glm::vec3 k = hr.params->material->evaluate(l,v,n);
 
-	return {k.r * E.r, k.g * E.g, k.b * E.b};
+	glm::vec3 colour_final = {k.r*E.r, k.g*E.g, k.b*E.b};
+
+	return colour_final;
+
 }
 

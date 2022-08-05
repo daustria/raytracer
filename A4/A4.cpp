@@ -8,6 +8,8 @@
 #include "Ray.hpp"
 #include "Primitive.hpp"
 #include "PhongMaterial.hpp"
+#define EPSILON 0.1f
+#define MAX_RECURSION_DEPTH 5
 #define PLANE_WIDTH 100
 #define PLANE_HEIGHT 100
 #define PLANE_DISTANCE 100
@@ -134,7 +136,7 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_primitives, std:
 			Primitive *surface = geometryNode->m_primitive;
 
 			SurfaceParams sp;
-			sp.material = geometryNode->m_material;
+			sp.material = static_cast<PhongMaterial *>(geometryNode->m_material);
 			sp.name = geometryNode->m_name;
 			sp.trans = ms.active_transform;
 			sp.inv_trans = glm::inverse(ms.active_transform);
@@ -176,6 +178,67 @@ void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scen
 
 	processNode(*first, scene_primitives, surface_parameters, ms);
 	processNodeList(nodes, scene_primitives, surface_parameters, ms);
+}
+
+glm::vec3 shadeRay(const Ray &r, 
+		float t0, 
+		float t1, 
+		const SurfaceGroup &scene_surfaces, 
+		const glm::vec3 &ambient, 
+		const std::list<Light *> &lights,
+		int depth = 0)
+{
+
+	HitRecord hr;
+
+	// Intersect the ray with all the surfaces
+	scene_surfaces.hit(hr, r, 0, RAY_DISTANCE_MAX);
+
+	if (hr.miss) {
+
+		glm::vec3 sky_blue = {0.0f, 0.8f, 0.95f};
+		return sky_blue; 
+
+	} else {
+
+		// Compute the colour of the pixel, taking into account
+		// the various point-light sources
+
+		// Also take into account ambient lighting, leave this as a simple computation for now.
+		// Ideally the factor multiplying the ambient intensity should be part of the material,
+		// but that seems to requires some changes to the skeleton assignment code that I would like to leave for later.
+
+		static const float K_AMBIENT(0.8f);
+
+		glm::vec3 colour = ambient*K_AMBIENT;
+
+		for ( const Light *light : lights )
+		{
+			// Note: if we exceed 1.0f here, it treats it like 1.0f
+			colour = colour + light->illuminate(r, hr, scene_surfaces);
+		}
+
+		if (depth >= MAX_RECURSION_DEPTH) {
+
+			return colour;
+
+		} else {
+
+			glm::vec3 o_mirror = hr.hit_point;
+
+			glm::vec3 d_mirror = r.d - 2*glm::dot(r.d,hr.n)*hr.n;
+
+			Ray r_mirror(o_mirror, d_mirror);
+
+			glm::vec3 k_mirror = hr.params->material->ks;
+
+			glm::vec3 reflection_colour = shadeRay(r_mirror, EPSILON, RAY_DISTANCE_MAX, scene_surfaces, ambient, lights, depth + 1);
+
+			return colour + glm::vec3{k_mirror.r * reflection_colour.r, k_mirror.g * reflection_colour.g, k_mirror.b * reflection_colour.b};
+		}
+
+	}
+
 }
 
 void printPercentDone(size_t current_col, size_t total_cols)
@@ -298,43 +361,11 @@ void A4_Render(
 		
 			Ray r{eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam};
 
-			HitRecord hr;
+			glm::vec3 colour = shadeRay(r, 0, RAY_DISTANCE_MAX, surfaces, ambient, lights);
 
-			// Intersect the ray with all the surfaces
-			surfaces.hit(hr, r, 0, RAY_DISTANCE_MAX);
-			
-			// some debugging code.. i just change x and y to be the pixels i want
-			if ( x == 250 && y == 250 ) {
-				//printf("HERE\n");
-			}
-
-			if (hr.miss) {
-				// We missed, so colour the background colour
-
-				image(x, y, 0) = 0.0f;
-				image(x, y, 1) = 0.8f;
-				image(x, y, 2) = 0.95f;
-			} else {
-				// Compute the colour of the pixel, taking into account
-				// the various point-light sources
-
-				// Also take into account ambient lighting, leave this as a simple computation for now.
-				// Ideally the factor multiplying the ambient intensity should be part of the material,
-				// but that seems to requires some changes to the skeleton assignment code that I would like to leave for later.
-
-				static const float K_AMBIENT(0.8f);
-				glm::vec3 colour = ambient*K_AMBIENT;
-
-				for ( const Light *light : lights )
-				{
-					// Note: if we exceed 1.0f here, it treats it like 1.0f
-					colour = colour + light->illuminate(r, hr, surfaces);
-				}
-
-				image(x, y, 0) = (double) colour.r;
-				image(x, y, 1) = (double) colour.g;
-				image(x, y, 2) = (double) colour.b;
-			}
+			image(x, y, 0) = colour.r;
+			image(x, y, 1) = colour.g;
+			image(x, y, 2) = colour.b;
 
 		}
 	}
