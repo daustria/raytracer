@@ -347,7 +347,9 @@ void A4_Render(
 	for (uint y = 0; y < h; ++y) {
 		for (uint x = 0; x < w; ++x) {
 
-			printPercentDone(y, h);
+			// This reporting of progress does not work in the multithreading case... I will need to update how I report progress
+
+			// printPercentDone(y, h);
 
 			// Our image dimensions are w by h.
 			// pixel position (i,j) in the image corresponds to the point (u,v) on the plane (where the ray passes through) and
