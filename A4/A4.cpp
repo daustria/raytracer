@@ -343,6 +343,7 @@ void A4_Render(
 	// printf("Ray origin:(%f,%f,%f)\n", eye.x, eye.y, eye.z);
 #endif
 
+#pragma omp parallel for schedule(dynamic, 1)
 	for (uint y = 0; y < h; ++y) {
 		for (uint x = 0; x < w; ++x) {
 
