@@ -6,7 +6,6 @@
 #include <string>
 #include "PhongMaterial.hpp"
 #include "Ray.hpp"
-#define RAY_DISTANCE_MAX 2000
 
 class Primitive; 
 
@@ -63,16 +62,6 @@ public:
 
 };
 
-class Sphere : public Primitive {
-public:
-	virtual ~Sphere();
-};
-
-class Cube : public Primitive {
-public:
-	virtual ~Cube();
-};
-
 // For the nonhierarchical shapes, we will assume they are untransformed.
 class NonhierSphere : public Primitive {
 public:
@@ -108,6 +97,25 @@ private:
 
 	glm::vec3 m_min;
 	glm::vec3 m_max;
+};
+
+class Sphere : public Primitive {
+public:
+	Sphere();
+	virtual ~Sphere();
+
+	virtual void hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
+private:
+	NonhierSphere m_nh_sphere;
+};
+
+class Cube : public Primitive {
+public:
+	Cube();
+	virtual ~Cube();
+	virtual void hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const override;
+private:
+	NonhierBox m_nh_box;
 };
 
 // Convenience class for determining how a ray hits a group of surfaces...

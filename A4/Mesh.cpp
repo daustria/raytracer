@@ -226,6 +226,8 @@ void Mesh::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 	m_boundingBox.hitBase(hr, r, t_0, t_1);
 
 	if (hr.miss) {
+		// We did not hit our bounding box so let's not bother even 
+		// checking if it hit any of our triangles in the mesh and bail out
 		return;
 	}
 		

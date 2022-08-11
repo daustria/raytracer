@@ -1,245 +1,21 @@
-#include <glm/ext.hpp>
-#include <glm/gtx/io.hpp>
 #include <assert.h>
 #include <iostream>
 #include <stack>
+
+#include <glm/ext.hpp>
+#include <glm/gtx/io.hpp>
+
 #include "A4.hpp"
+#include "A4_utils.hpp"
 #include "GeometryNode.hpp"
-#include "Ray.hpp"
 #include "Primitive.hpp"
 #include "PhongMaterial.hpp"
+
 #define EPSILON 0.1f
 #define MAX_RECURSION_DEPTH 5
-#define PLANE_WIDTH 100
-#define PLANE_HEIGHT 100
-#define PLANE_DISTANCE 100
-
-// Ray --------------------------------------------------------------------------
-Ray::Ray(const glm::vec3 &origin, const glm::vec3 &direction) 
-	: m_origin(origin), m_direction(direction), o(m_origin), d(m_direction)
-{
-	static const float EPSILON_RAY = 0.1f;
-	// Want to make sure our direction is non-zero. I don't want to 
-	// worry about rays with a null direction
-	assert(glm::length2(direction) > EPSILON_RAY^2);
-}
-
-glm::vec3 Ray::evaluate(float t) const
-{
-	return o + t*d;
-}
-
-void Ray::transform(const glm::mat4 &m)
-{
-	// First transform the origin..
-	glm::vec4 o_{o, 1.0f};
-
-	o_ = m*o_;
-
-	if (o_.w == 1.0f) {
-		m_origin = glm::vec3{o_.x, o_.y, o_.z};
-	} else {
-		// this division shouldnt actually be necessary
-		m_origin = glm::vec3{o_.x, o_.y, o_.z} * (1 / (o_.w));
-	}
-
-	m_direction = glm::mat3(m)*d;
-}
-
-// Matrix Stack ------------------------------------------------------------------
-// Convenience struct for handling the active transformation
-// when walking the scene graph. Copied from A3 
-struct MatrixStack {
-	// TODO : Make this class keep inverse transformations. Or 
-	// come up with another solution so that we don't compute inverse transformation matrices
-	// when we do the ray object intersection 
-	MatrixStack();
-
-	// Right multiplies the active transform by m. Requires
-	// that this transformation is invertible (for calling pop())
-	void push(const glm::mat4 &m); 
-
-	// Removes the most recently pushed matrix
-	void pop(); 
-
-	// Empties the stack, resets active_transform to the identity
-	void reset();
-
-	// Matrix representing the product of all transformations
-	// in the stack matrices
-	glm::mat4 active_transform;
-	glm::mat4 active_inverse;
-	std::stack<glm::mat4> matrices;
-	std::stack<glm::mat4> inverses;
-};
-
-//----------------------------------------------------------------------------------------
-MatrixStack::MatrixStack() : active_transform(glm::mat4(1.0f)), active_inverse(glm::mat4(1.0f))
-{
-
-}
-
-//----------------------------------------------------------------------------------------
-void MatrixStack::push(const glm::mat4 &m)
-{
-	glm::mat4 inv = glm::mat4(m);
-
-	matrices.push(m);
-	inverses.push(inv);
-	active_transform = active_transform*m;
-	active_inverse = inv * active_inverse;
-}
-
-//----------------------------------------------------------------------------------------
-void MatrixStack::pop()
-{
-	glm::mat4 m_inverse = glm::inverse(matrices.top());
-
-	// 'Undo' the matrix by right multiplying the active transform by the inverse
-	active_transform = active_transform * m_inverse;
-
-	active_inverse = matrices.top() * active_inverse;
-
-	// We don't need it anymore
-	matrices.pop();
-}
-
-//----------------------------------------------------------------------------------------
-void MatrixStack::reset()
-{
-	matrices = std::stack<glm::mat4>();
-	inverses = std::stack<glm::mat4>();
-	active_transform = glm::mat4(1.0f);
-	active_inverse = glm::mat4(1.0f);
-}
-
-// A few helper functions for walking the scene graph and preparing the primitives.
-
-void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_primitives, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms);
-
-void processNode(SceneNode &node, std::list<Primitive *> &scene_primitives, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms)
-{
-	// First thing is to push the node's local transform 
-	ms.push(node.get_transform());	
-
-	switch(node.m_nodeType)
-	{
-		case NodeType::GeometryNode:
-		{
-			const GeometryNode *geometryNode = static_cast<const GeometryNode *>(&node);
-
-			// We also need to prepare the primitive with the right properties
-
-
-			// Error: these Primitive pointers are shared. I need to change this so that either I walk the scene graph on each render,
-			// or I make a new Primitive.
-			Primitive *surface = geometryNode->m_primitive;
-
-			SurfaceParams sp;
-			sp.material = static_cast<PhongMaterial *>(geometryNode->m_material);
-			sp.name = geometryNode->m_name;
-			sp.trans = ms.active_transform;
-			sp.inv_trans = glm::inverse(ms.active_transform);
-
-			surface_parameters.push_back(sp);	
-			scene_primitives.push_back(surface);
-
-			break;
-		}
-		case NodeType::SceneNode:
-			// Do nothing
-			break;
-		case NodeType::JointNode:
-			// We aren't using joint nodes right now, so fall through to failure case
-		default:
-			printf("Default case reached, aborting");
-			abort();
-	}	
-
-	// After rendering the node we process all its children
-	// (make a copy first so we can safely modify the list in the mutual recursion)
-	
-	std::list<SceneNode *> children_copy = node.children;
-	processNodeList(children_copy, scene_primitives, surface_parameters, ms);
-
-	// We have processed all of its node's children, so we can safely pop off the transformation
-	// local to this node
-	ms.pop();
-}
-
-void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scene_primitives, std::list<SurfaceParams> &surface_parameters, MatrixStack &ms)
-{
-	if(nodes.empty()) {
-		return;
-	} 
-
-	SceneNode *first = nodes.front();
-	nodes.pop_front();
-
-	processNode(*first, scene_primitives, surface_parameters, ms);
-	processNodeList(nodes, scene_primitives, surface_parameters, ms);
-}
-
-glm::vec3 shadeRay(const Ray &r, 
-		float t0, 
-		float t1, 
-		const SurfaceGroup &scene_surfaces, 
-		const glm::vec3 &ambient, 
-		const std::list<Light *> &lights,
-		int depth = 0)
-{
-
-	HitRecord hr;
-
-	// Intersect the ray with all the surfaces
-	scene_surfaces.hit(hr, r, 0, RAY_DISTANCE_MAX);
-
-	if (hr.miss) {
-
-		glm::vec3 sky_blue = {0.0f, 0.8f, 0.95f};
-		return sky_blue; 
-
-	} else {
-
-		// Compute the colour of the pixel, taking into account
-		// the various point-light sources
-
-		// Also take into account ambient lighting, leave this as a simple computation for now.
-		// Ideally the factor multiplying the ambient intensity should be part of the material,
-		// but that seems to requires some changes to the skeleton assignment code that I would like to leave for later.
-
-		static const float K_AMBIENT(0.8f);
-
-		glm::vec3 colour = ambient*K_AMBIENT;
-
-		for ( const Light *light : lights )
-		{
-			// Note: if we exceed 1.0f here, it treats it like 1.0f
-			colour = colour + light->illuminate(r, hr, scene_surfaces);
-		}
-
-		if (depth >= MAX_RECURSION_DEPTH) {
-
-			return colour;
-
-		} else {
-
-			glm::vec3 o_mirror = hr.hit_point;
-
-			glm::vec3 d_mirror = r.d - 2*glm::dot(r.d,hr.n)*hr.n;
-
-			Ray r_mirror(o_mirror, d_mirror);
-
-			glm::vec3 k_mirror = hr.params->material->ks;
-
-			glm::vec3 reflection_colour = shadeRay(r_mirror, EPSILON, RAY_DISTANCE_MAX, scene_surfaces, ambient, lights, depth + 1);
-
-			return colour + glm::vec3{k_mirror.r * reflection_colour.r, k_mirror.g * reflection_colour.g, k_mirror.b * reflection_colour.b};
-		}
-
-	}
-
-}
+#define PLANE_HEIGHT 50
+#define PLANE_WIDTH 1.5 * PLANE_HEIGHT
+#define PLANE_DISTANCE 50
 
 void printPercentDone(size_t current_col, size_t total_cols)
 {
@@ -267,6 +43,70 @@ void printPercentDone(size_t current_col, size_t total_cols)
 		}
 	}
 }
+
+glm::vec3 shadeRay(const Ray &r, 
+		float t0, 
+		float t1, 
+		const SurfaceGroup &scene_surfaces, 
+		const glm::vec3 &ambient, 
+		const std::list<Light *> &lights,
+		int depth = 0)
+{
+
+	HitRecord hr;
+
+	// Intersect the ray with all the surfaces
+	scene_surfaces.hit(hr, r, 0, RAY_DISTANCE_MAX);
+
+	// glm::vec3 sky_blue = {0.0f, 0.8f, 0.95f};
+	glm::vec3 background_colour = {1.0, 1.0, 1.0};
+
+	if (hr.miss) {
+
+		return background_colour;
+
+	} else {
+
+		// Compute the colour of the pixel, taking into account
+		// the various point-light sources
+
+		// Also take into account ambient lighting, leave this as a simple computation for now.
+		// Ideally the factor multiplying the ambient intensity should be part of the material,
+		// but that seems to requires some changes to the skeleton assignment code that I would like to leave for later.
+
+		static const float K_AMBIENT(0.8f);
+
+		glm::vec3 colour = ambient*K_AMBIENT;
+
+		for ( const Light *light : lights )
+		{
+			// Note: if we exceed 1.0f here (in any of the rgb channels) it is treated like 1.0f.
+			colour = colour + light->illuminate(r, hr, scene_surfaces);
+		}
+
+		if (depth >= MAX_RECURSION_DEPTH) {
+
+			return colour;
+
+		} else {
+
+			const glm::vec3 &o_mirror = hr.hit_point;
+
+			const glm::vec3 &d_mirror = r.d - 2*glm::dot(r.d,hr.n)*hr.n;
+
+			Ray r_mirror(o_mirror, d_mirror);
+
+			const glm::vec3 &k_mirror = hr.params->material->ks;
+
+			glm::vec3 reflection_colour = shadeRay(r_mirror, EPSILON, RAY_DISTANCE_MAX, scene_surfaces, ambient, lights, depth + 1);
+
+			return colour + glm::vec3{k_mirror.r * reflection_colour.r, k_mirror.g * reflection_colour.g, k_mirror.b * reflection_colour.b};
+		}
+
+	}
+
+}
+
 
 // The actual ray tracing function
 void A4_Render(

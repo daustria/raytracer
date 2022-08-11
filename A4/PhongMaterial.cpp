@@ -27,7 +27,6 @@ std::string getAssetFilePath(const std::string &fname)
 
 PhongMaterial::PhongMaterial(const std::string &fname) : kd(m_kd), ks(m_ks)
 {
-
 	// Load the material parameters from the file. Note that we only
 	// read one material.
 

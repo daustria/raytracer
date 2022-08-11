@@ -27,7 +27,7 @@ std::ostream& operator<<(std::ostream& out, const Light& l)
 
 glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGroup &surfaces) const
 {
-	static const float SHADOW_EPSILON(1.0f);
+	static const float SHADOW_EPSILON(0.1f);
 	static const int MAX_DEPTH = 10;
 
 	glm::vec3 x = hr.hit_point;
@@ -47,13 +47,7 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGrou
 		return {0,0,0};	
 	}
 
-	glm::vec3 n = hr.n ; //surface normal, we assume this to be normalized already
-
-	/*
-	if (glm::dot(n,l) < 0) {
-		n = -n;
-	}
-	*/
+	const glm::vec3 &n = hr.n ; //surface normal, we assume this to be normalized already
 
 	// irradiance, describing the amount of radiant power per unit area.
 	// This computation of irradiance is specific for point light sources
@@ -77,6 +71,5 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGrou
 	glm::vec3 colour_final = {k.r*E.r, k.g*E.g, k.b*E.b};
 
 	return colour_final;
-
 }
 

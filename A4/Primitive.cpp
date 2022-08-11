@@ -1,8 +1,7 @@
 #include "Primitive.hpp"
 #include "polyroots.hpp"
+#include <glm/ext.hpp>
 #include <limits>
-
-static const float EPSILON = 0.01f;
 
 Primitive::Primitive() : m_primitiveType(PrimitiveType::None)
 {
@@ -73,15 +72,35 @@ void Primitive::updateTextureCoordinates(HitRecord &hr) const
 }
 
 // Sphere ----------------------------------------------------------------------------
+
+Sphere::Sphere() : m_nh_sphere(NonhierSphere({0,0,0}, 1.0))
+{
+}
+
+void Sphere::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const 
+{
+	m_nh_sphere.hitBase(hr, r, t_0, t_1);
+}
+
 Sphere::~Sphere()
 {
 
 }
 
 // Cube ----------------------------------------------------------------------------
+Cube::Cube() : m_nh_box(NonhierBox({0,0,0},{1,1,1}))
+{
+
+}
+
 Cube::~Cube()
 {
 
+}
+
+void Cube::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const 
+{
+	m_nh_box.hitBase(hr, r, t_0, t_1);
 }
 
 // Nonhier Sphere --------------------------------------------------------------------
@@ -94,7 +113,6 @@ NonhierSphere::NonhierSphere(const glm::vec3& position, double radius)
 NonhierSphere::~NonhierSphere()
 {
 }
-
 
 void NonhierSphere::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const
 {
@@ -184,7 +202,8 @@ NonhierBox::NonhierBox(const glm::vec3& bmin, const glm::vec3 &bmax)
 
 bool approx(float a, float b)
 {
-	return abs(a - b) < EPSILON;
+	static const float EPSILON_APPROX(0.3f);
+	return abs(a - b) < EPSILON_APPROX;
 }
 
 // TODO : I think this function is broken, need to fix, but not essential right now since
@@ -198,8 +217,6 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 	// y = min.y		y = max.y
 	// z = min.z		z = max.z
 
-	static bool hit_error(false);
-
 	if (approx(p.x, m_min.x)) {
 		return {-1.0f, 0, 0};
 	}
@@ -208,7 +225,7 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 		return {0, -1.0f, 0};
 	}
 
-	if (approx(p.y, m_min.z)) {
+	if (approx(p.z, m_min.z)) {
 		return {0, 0, 1.0f};
 	}
 
@@ -224,48 +241,53 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 		return {0, 0, -1.0f};
 	}
 
-	if (!hit_error) {
-		printf("%s | Error: no normal computed for point {%.2f,%.2f,%.2f}\n", __func__, p.x, p.y, p.z);
-		hit_error = true;
-	}
-
-	return {0,1.0f,0};
+	return {0,0,0};
 
 }
 
 void NonhierBox::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) const 
 {
-	// Implementation of box primitives seems difficult and not much
-	// official resources. I think I'll just leave box as triangle meshes
-	// and worry about ray triangle intersections
+
 	float tmin = t_0;
 	float tmax = t_1;
 
+	bool hit = true;
 
 	for (int i = 0; i < 3; ++i) {
-		// Note : we assume our rays always have non-zero direction before
-		// trying to intersect them
 
-		float t1 = (m_min[i] - r.o[i])/r.d[i];
-		float t2 = (m_max[i] - r.o[i])/r.d[i];
+		if (r.d[i] != 0.0) {
+		    float t1 = (m_min[i] - r.o[i])/r.d[i];
+		    float t2 = (m_max[i] - r.o[i])/r.d[i];
 
-		tmin = std::max(tmin, std::min(t1, t2));
-		tmax = std::min(tmax, std::max(t1, t2));
+		    tmin = std::max(tmin, std::min(t1, t2));
+		    tmax = std::min(tmax, std::max(t1, t2));
+		} else if (r.o[i] <= m_min[i] || r.o[i] >= m_max[i]) {
+			hit = false;
+		}
 	}
 
-	bool hit = tmax > tmin;
+	hit = hit && (tmax > tmin && tmax > 0.0f);
 
 	if (hit) {
+
 		hr.p = this;
-		hr.t = tmin;
 		hr.miss = false;
+
+		hr.t = tmin;
 		hr.hit_point = r.evaluate(tmin);
 		hr.n = computeNormal(hr.hit_point);
-	} else {
-		hr.p = this;
-		hr.t = -1;
-		hr.miss = true;
+
+		// For now, let's return even if we get a 0 normal and we hit inside the box.
+		// I'm doing this because of bounding boxes.
+		return;
+
 	}
+
+	// If we are here, we missed.	
+
+	hr.p = this;
+	hr.t = -1;
+	hr.miss = true;
 
 }
 

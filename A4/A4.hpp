@@ -1,10 +1,15 @@
-#pragma once
+#ifndef A4_HPP
+#define A4_HPP
 
 #include <glm/glm.hpp>
+#include <glm/ext.hpp>
+#include <stack>
 
 #include "SceneNode.hpp"
+#include "GeometryNode.hpp"
 #include "Light.hpp"
 #include "Image.hpp"
+#include "Ray.hpp"
 
 void A4_Render(
 		// What to render
@@ -23,3 +28,6 @@ void A4_Render(
 		const glm::vec3 & ambient,
 		const std::list<Light *> & lights
 );
+
+
+#endif //A4_HPP

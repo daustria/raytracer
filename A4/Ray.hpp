@@ -1,7 +1,8 @@
 #ifndef RAY_H
 #define RAY_H
 #include <glm/glm.hpp>
-// Keep this class simple for now.. we may construct ray's in a more pedantic fashion later
+#define RAY_DISTANCE_MAX 5000
+
 class Ray
 {
 public:
