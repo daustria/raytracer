@@ -63,8 +63,6 @@ private:
 
 	void readFaceIndices(const std::string & data);
 
-	void printDebugInfo() const;
-
 	friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
 
 	std::vector<glm::vec3> m_vertices;
@@ -76,5 +74,10 @@ private:
 	glm::vec3 m_bmin;
 	glm::vec3 m_bmax;
 	NonhierBox m_boundingBox;
+
+	std::string m_objName;
+
+public:
+	const std::string &objName;
 
 };

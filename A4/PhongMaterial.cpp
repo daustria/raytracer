@@ -123,7 +123,9 @@ glm::vec3 PhongMaterial::evaluate(const glm::vec3 &l, const glm::vec3 &v, const 
 	glm::vec3 colour = kd*pi_inv + m_ks * (float) glm::pow( std::fmax(0, glm::dot(n,h)), m_ns );
 
 	if (m_texture) {
-		// return m_textureColour;
+		// When I am making a scene with few textured pieces I want the textures to show a lot.. so I'll just 
+		// use the texture colour straight up.
+		return 0.8f*m_textureColour + 0.2f*colour;
 		return {colour.r * m_textureColour.r, colour.g * m_textureColour.g, colour.b * m_textureColour.b};
 	} else {
 		return colour;

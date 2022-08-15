@@ -11,38 +11,11 @@
 #include "Primitive.hpp"
 #include "PhongMaterial.hpp"
 
-#define EPSILON 0.1f
+#define EPSILON 0.01f
 #define MAX_RECURSION_DEPTH 5
 #define PLANE_HEIGHT 50
-#define PLANE_WIDTH 1.5 * PLANE_HEIGHT
+#define PLANE_WIDTH 50
 #define PLANE_DISTANCE 50
-
-void printPercentDone(size_t current_col, size_t total_cols)
-{
-
-	static const int NUM_MARKERS(4);	
-	static const float thresholds[NUM_MARKERS] = {0.25f,0.5f,0.75f,0.95f};
-	static int print_threshold[NUM_MARKERS] = {0,0,0,0};
-	static int threshold_called[NUM_MARKERS] = {0,0,0,0};
-
-	float ratio = current_col / (float) total_cols;
-
-	for(int i = 0; i < NUM_MARKERS; ++i) {
-		if (ratio > thresholds[i]) {
-			print_threshold[i] = 1;
-		}
-	}
-
-	for(int i = 0; i < NUM_MARKERS; ++i) {
-		if (print_threshold[i]) {
-			if (threshold_called[i] == 0) {
-				float percentage = 100*thresholds[i];
-				printf("%.2f %% finished \n", percentage);
-				threshold_called[i] = 1;
-			}
-		}
-	}
-}
 
 glm::vec3 shadeRay(const Ray &r, 
 		float t0, 
@@ -56,10 +29,14 @@ glm::vec3 shadeRay(const Ray &r,
 	HitRecord hr;
 
 	// Intersect the ray with all the surfaces
-	scene_surfaces.hit(hr, r, 0, RAY_DISTANCE_MAX);
+	scene_surfaces.hit(hr, r, t0, t1);
 
-	// glm::vec3 sky_blue = {0.0f, 0.8f, 0.95f};
-	glm::vec3 background_colour = {1.0, 1.0, 1.0};
+	// glm::vec3 background_colour = {0.0f, 0.8f, 0.95f}; sky blue
+	
+	// white
+	glm::vec3 background_colour = {1.0, 1.0, 1.0}; 
+	// glm::vec3 background_colour = {0.0f, 0.0f, 0.0f};
+	// glm::vec3 background_colour = {0.7f, 0.7f, 0.7f};
 
 	if (hr.miss) {
 
@@ -92,13 +69,20 @@ glm::vec3 shadeRay(const Ray &r,
 
 			const glm::vec3 &o_mirror = hr.hit_point;
 
-			const glm::vec3 &d_mirror = r.d - 2*glm::dot(r.d,hr.n)*hr.n;
+			const glm::vec3 &n = hr.n;
+
+			glm::vec3 d_mirror = r.d - 2*glm::dot(r.d,n)*n;
 
 			Ray r_mirror(o_mirror, d_mirror);
 
 			const glm::vec3 &k_mirror = hr.params->material->ks;
 
 			glm::vec3 reflection_colour = shadeRay(r_mirror, EPSILON, RAY_DISTANCE_MAX, scene_surfaces, ambient, lights, depth + 1);
+
+			if (glm::length2(reflection_colour - background_colour) < EPSILON) {
+				// Discard background colour reflections
+				// return colour;
+			}
 
 			return colour + glm::vec3{k_mirror.r * reflection_colour.r, k_mirror.g * reflection_colour.g, k_mirror.b * reflection_colour.b};
 		}
@@ -204,7 +188,7 @@ void A4_Render(
 		
 			Ray r{eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam};
 
-			glm::vec3 colour = shadeRay(r, 0, RAY_DISTANCE_MAX, surfaces, ambient, lights);
+			glm::vec3 colour = shadeRay(r, 0, RAY_DISTANCE_MAX, surfaces, ambient, lights, 0);
 
 			image(x, y, 0) = colour.r;
 			image(x, y, 1) = colour.g;

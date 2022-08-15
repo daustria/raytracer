@@ -5,28 +5,6 @@
 // #include "cs488-framework/ObjFileDecoder.hpp"
 #include "Mesh.hpp"
 
-
-void Mesh::printDebugInfo() const
-{
-	std::cout << "===========TRIANGLES==========" << std::endl;
-
-	for (const Triangle &t : m_faces)
-	{
-		printf("=======================================================\n");
-		glm::vec3 v = m_vertices[t.v1];
-		glm::dvec2 uv = m_textureCoordinates[t.u1];
-		printf("Vertex A: {%.2f,%.2f,%.2f,%.2f,%.2f}\n", v.x, v.y, v.z, uv[0], uv[1]);
-		printf("================================================\n");
-		v = m_vertices[t.v2];
-		uv = m_textureCoordinates[t.u2];
-		printf("Vertex B: {%.2f,%.2f,%.2f,%.2f,%.2f}\n", v.x, v.y, v.z, uv[0], uv[1]);
-		printf("================================================\n");
-		v = m_vertices[t.v3];
-		uv = m_textureCoordinates[t.u3];
-		printf("Vertex C: {%.2f,%.2f,%.2f,%.2f,%.2f}\n", v.x, v.y, v.z, uv[0], uv[1]);
-	}
-
-}
 static std::string getAssetFilePath(const std::string &fname) 
 {
 
@@ -45,6 +23,7 @@ Mesh::Mesh( const std::string& fname )
 	: m_vertices()
 	  , m_faces()
 	  , m_boundingBox(glm::vec3(), 1.0f)
+	  , objName(m_objName)
 {
 	std::string code;
 
@@ -110,6 +89,10 @@ Mesh::Mesh( const std::string& fname )
 			// moved it to this helper function
 			readFaceIndices(currentLine);
 
+		} else if (code == "o") {
+
+			ifs >> m_objName;
+
 		} else {
 
 			printf(" %s | Skipping code %s in reading Mesh file %s\n", __func__, code.c_str(), fname.c_str());
@@ -122,7 +105,7 @@ Mesh::Mesh( const std::string& fname )
 
 	}
 
-	m_boundingBox = NonhierBox(m_bmin, m_bmax - m_bmin);
+	m_boundingBox = NonhierBox(m_bmin, m_bmax);
 	m_primitiveType = PrimitiveType::Mesh;
 
 	// printDebugInfo();

@@ -1,5 +1,6 @@
 #include "Primitive.hpp"
 #include "polyroots.hpp"
+#include "Mesh.hpp"
 #include <glm/ext.hpp>
 #include <limits>
 
@@ -226,7 +227,7 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 	}
 
 	if (approx(p.z, m_min.z)) {
-		return {0, 0, 1.0f};
+		return {0, 0, -1.0f};
 	}
 
 	if (approx(p.x, m_max.x)) {
@@ -238,7 +239,7 @@ glm::vec3 NonhierBox::computeNormal(const glm::vec3 &p) const
 	}
 
 	if (approx(p.z, m_max.z)) {
-		return {0, 0, -1.0f};
+		return {0, 0, 1.0f};
 	}
 
 	return {0,0,0};
@@ -277,8 +278,10 @@ void NonhierBox::hitBase(HitRecord &hr, const Ray &r, float t_0, float t_1) cons
 		hr.hit_point = r.evaluate(tmin);
 		hr.n = computeNormal(hr.hit_point);
 
-		// For now, let's return even if we get a 0 normal and we hit inside the box.
-		// I'm doing this because of bounding boxes.
+		if (glm::length2(hr.n) > 0.0f) {
+			return;
+		}
+
 		return;
 
 	}
@@ -391,8 +394,15 @@ std::ostream & operator << (std::ostream & os, const Primitive &p)
 			// Print each one in the group
 			break;
 		case PrimitiveType::Mesh:
-			os << "Mesh";
-			break;
+			{
+				const Mesh *mesh = static_cast<const Mesh *>(&p);
+				sprintf(buffer, " name:%s", mesh->objName.c_str());
+
+				os << "Mesh: ";
+				os << buffer;
+				break;
+
+			}
 		default:
 			printf("%s | Error, default case reached\n", __func__);
 	}

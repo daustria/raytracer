@@ -28,16 +28,17 @@ std::ostream& operator<<(std::ostream& out, const Light& l)
 glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGroup &surfaces) const
 {
 	static const float SHADOW_EPSILON(0.1f);
-	static const int MAX_DEPTH = 10;
 
 	glm::vec3 x = hr.hit_point;
 	glm::vec3 l = glm::normalize(position - x); // light direction
+
+	float dist = glm::length(position - x);
 
 	// First we check if the shading point is in the shadow
 	Ray r_shadow(x, l);
 	HitRecord hr_shadow;
 
-	surfaces.hit(hr_shadow, r_shadow, SHADOW_EPSILON, RAY_DISTANCE_MAX);
+	surfaces.hit(hr_shadow, r_shadow, SHADOW_EPSILON, dist);
 
 	if (!hr_shadow.miss) {
 		// for debugging purposes, i can breakpoint here, seeing what the code looks like
@@ -53,7 +54,6 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGrou
 	// This computation of irradiance is specific for point light sources
 	
 	// We borrow this quadratic attenuation computation from the CS488 course notes
-	float dist = glm::length(position - x);
 	float attenuation = falloff[0] + falloff[1]*dist + falloff[2]*dist*dist;
 	glm::vec3 E = colour * ( std::fmax(0, glm::dot(n,l) / attenuation ));
 

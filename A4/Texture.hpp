@@ -21,7 +21,6 @@ public:
 
 	~ImageTexture();
 
-
 	// The colour of position (u,v) of the texture image
 	virtual glm::vec3 value(double u, double v, const glm::vec3& p) const override;
 
