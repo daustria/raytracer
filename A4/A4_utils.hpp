@@ -1,7 +1,8 @@
 #ifndef A4_UTILS_H
 #define A4_UTILS_H
-#include <glm/glm.hpp>
+#include <random>
 #include <stack>
+#include <glm/glm.hpp>
 
 // Matrix Stack ------------------------------------------------------------------
 // Convenience struct for handling the active transformation
@@ -133,6 +134,14 @@ void processNodeList(std::list<SceneNode *> &nodes, std::list<Primitive *> &scen
 
 	processNode(*first, scene_primitives, surface_parameters, ms);
 	processNodeList(nodes, scene_primitives, surface_parameters, ms);
+}
+
+// For antialiasing
+double random_double() 
+{
+	static std::uniform_real_distribution<double> distribution(0.0, 1.0);
+	static std::mt19937 generator;
+	return distribution(generator);	
 }
 
 #endif //A4_UTILS_H

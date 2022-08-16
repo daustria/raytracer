@@ -1,9 +1,10 @@
 #ifndef A4_HPP
 #define A4_HPP
 
+#include <stack>
+
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
-#include <stack>
 
 #include "SceneNode.hpp"
 #include "GeometryNode.hpp"

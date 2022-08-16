@@ -16,6 +16,8 @@
 #define PLANE_HEIGHT 50
 #define PLANE_WIDTH 50
 #define PLANE_DISTANCE 50
+#define SAMPLES_PER_PIXEL 10 
+// #define ALIASING_A4
 
 glm::vec3 shadeRay(const Ray &r, 
 		float t0, 
@@ -90,7 +92,6 @@ glm::vec3 shadeRay(const Ray &r,
 	}
 
 }
-
 
 // The actual ray tracing function
 void A4_Render(
@@ -170,11 +171,7 @@ void A4_Render(
 #pragma omp parallel for schedule(dynamic, 1)
 	for (uint y = 0; y < h; ++y) {
 		for (uint x = 0; x < w; ++x) {
-
-			// This reporting of progress does not work in the multithreading case... I will need to update how I report progress
-
-			// printPercentDone(y, h);
-
+#ifndef ALIASING_A4 
 			// Our image dimensions are w by h.
 			// pixel position (i,j) in the image corresponds to the point (u,v) on the plane (where the ray passes through) and
 			// we compute (u,v) as...
@@ -184,8 +181,7 @@ void A4_Render(
 			v = -v; // negate v, otherwise the images come out flipped 
 
 			// We construct our rays for a perspective view. The origin and direction are taken from textbook computations
-			// (4.3 of Shirley's book)
-		
+			// (4.3 of Shirley's book)		
 			Ray r{eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam};
 
 			glm::vec3 colour = shadeRay(r, 0, RAY_DISTANCE_MAX, surfaces, ambient, lights, 0);
@@ -193,7 +189,31 @@ void A4_Render(
 			image(x, y, 0) = colour.r;
 			image(x, y, 1) = colour.g;
 			image(x, y, 2) = colour.b;
+#else
 
+			float u,v;
+			glm::vec3 colour; 
+
+			for (int s = 0; s < SAMPLES_PER_PIXEL; ++s)
+			{
+				u = l + ((float) (r - l)*(x + random_double())) / w;
+				v = b + ((float) (t - b)*(y + random_double())) / h;
+				v = -v; // negate v, otherwise the images come out flipped 
+
+				// We construct our rays for a perspective view. The origin and direction are taken from textbook computations
+				// (4.3 of Shirley's book)		
+				Ray r{eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam};
+
+				colour = colour + shadeRay(r, 0, RAY_DISTANCE_MAX, surfaces, ambient, lights, 0);
+			}
+
+			float scale = 1.0 / SAMPLES_PER_PIXEL;
+			colour = colour*scale;
+
+			image(x, y, 0) = colour.r;
+			image(x, y, 1) = colour.g;
+			image(x, y, 2) = colour.b;
+#endif // ALIASING_A4
 		}
 	}
 

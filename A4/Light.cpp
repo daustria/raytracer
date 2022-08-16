@@ -27,7 +27,7 @@ std::ostream& operator<<(std::ostream& out, const Light& l)
 
 glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGroup &surfaces) const
 {
-	static const float SHADOW_EPSILON(0.1f);
+	static const float SHADOW_EPSILON(0.01f);
 
 	glm::vec3 x = hr.hit_point;
 	glm::vec3 l = glm::normalize(position - x); // light direction
