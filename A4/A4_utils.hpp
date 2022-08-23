@@ -92,7 +92,7 @@ void processNode(SceneNode &node, std::list<Primitive *> &scene_primitives, std:
 			Primitive *surface = geometryNode->m_primitive;
 
 			SurfaceParams sp;
-			sp.material = static_cast<PhongMaterial *>(geometryNode->m_material);
+			sp.material = static_cast<Material *>(geometryNode->m_material);
 			sp.name = geometryNode->m_name;
 			sp.trans = ms.active_transform;
 			sp.inv_trans = glm::inverse(ms.active_transform);

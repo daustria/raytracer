@@ -66,9 +66,9 @@ glm::vec3 Light::illuminate(const Ray &r, const HitRecord &hr, const SurfaceGrou
 
 	// The bidirectional reflectance distrubution function, or BRDF describes how the
 	// reflectance varies as functions of l and v. 
-	glm::vec3 k = hr.params->material->evaluate(l,v,n);
+	glm::vec3 brdf = hr.params->material->evaluate(l,v,n);
 
-	glm::vec3 colour_final = {k.r*E.r, k.g*E.g, k.b*E.b};
+	glm::vec3 colour_final = {brdf.r*E.r, brdf.g*E.g, brdf.b*E.b};
 
 	return colour_final;
 }

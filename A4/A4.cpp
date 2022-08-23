@@ -77,7 +77,9 @@ glm::vec3 shadeRay(const Ray &r,
 
 			Ray r_mirror(o_mirror, d_mirror);
 
-			const glm::vec3 &k_mirror = hr.params->material->ks;
+			PhongMaterial *phongMat = static_cast<PhongMaterial *>(hr.params->material);
+
+			const glm::vec3 &k_mirror = phongMat->ks;
 
 			glm::vec3 reflection_colour = shadeRay(r_mirror, EPSILON, RAY_DISTANCE_MAX, scene_surfaces, ambient, lights, depth + 1);
 
@@ -164,57 +166,57 @@ void A4_Render(
 	static const float t(PLANE_HEIGHT/2);
 	static const float b(-PLANE_HEIGHT/2);
 
-#ifndef NDEBUG
-	// printf("Ray origin:(%f,%f,%f)\n", eye.x, eye.y, eye.z);
-#endif
+// Iterate through the pixels this way, avoiding the double for-loop and
+// making it more natural to parallelize
 
-#pragma omp parallel for schedule(dynamic, 1)
-	for (uint y = 0; y < h; ++y) {
-		for (uint x = 0; x < w; ++x) {
+#pragma omp parallel for schedule(dynamic, 3)
+	for (int k = 0; k < w*h; ++k) 
+	{
+		uint x = k % w;
+		uint y = k / h;
+
 #ifndef ALIASING_A4 
-			// Our image dimensions are w by h.
-			// pixel position (i,j) in the image corresponds to the point (u,v) on the plane (where the ray passes through) and
-			// we compute (u,v) as...
+		// Our image dimensions are w by h.
+		// pixel position (i,j) in the image corresponds to the point (u,v) on the plane (where the ray passes through) and
+		// we compute (u,v) as...
 
-			float u = l + ((float) (r - l)*(x + 0.5f)) / w;
-			float v = b + ((float) (t - b)*(y + 0.5f)) / h;
+		float u = l + ((float) (r - l)*(x + 0.5f)) / w;
+		float v = b + ((float) (t - b)*(y + 0.5f)) / h;
+		v = -v; // negate v, otherwise the images come out flipped 
+
+		// We construct our rays for a perspective view. The origin and direction are taken from textbook computations
+		// (4.3 of Shirley's book)		
+		Ray r{eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam};
+
+		glm::vec3 colour = shadeRay(r, 0, RAY_DISTANCE_MAX, surfaces, ambient, lights, 0);
+
+		image(x, y, 0) = colour.r;
+		image(x, y, 1) = colour.g;
+		image(x, y, 2) = colour.b;
+#else
+		float u,v;
+		glm::vec3 colour; 
+
+		for (int s = 0; s < SAMPLES_PER_PIXEL; ++s)
+		{
+			u = l + ((float) (r - l)*(x + random_double())) / w;
+			v = b + ((float) (t - b)*(y + random_double())) / h;
 			v = -v; // negate v, otherwise the images come out flipped 
 
 			// We construct our rays for a perspective view. The origin and direction are taken from textbook computations
 			// (4.3 of Shirley's book)		
 			Ray r{eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam};
 
-			glm::vec3 colour = shadeRay(r, 0, RAY_DISTANCE_MAX, surfaces, ambient, lights, 0);
-
-			image(x, y, 0) = colour.r;
-			image(x, y, 1) = colour.g;
-			image(x, y, 2) = colour.b;
-#else
-
-			float u,v;
-			glm::vec3 colour; 
-
-			for (int s = 0; s < SAMPLES_PER_PIXEL; ++s)
-			{
-				u = l + ((float) (r - l)*(x + random_double())) / w;
-				v = b + ((float) (t - b)*(y + random_double())) / h;
-				v = -v; // negate v, otherwise the images come out flipped 
-
-				// We construct our rays for a perspective view. The origin and direction are taken from textbook computations
-				// (4.3 of Shirley's book)		
-				Ray r{eye, -PLANE_DISTANCE*w_cam + u*u_cam + v*v_cam};
-
-				colour = colour + shadeRay(r, 0, RAY_DISTANCE_MAX, surfaces, ambient, lights, 0);
-			}
-
-			float scale = 1.0 / SAMPLES_PER_PIXEL;
-			colour = colour*scale;
-
-			image(x, y, 0) = colour.r;
-			image(x, y, 1) = colour.g;
-			image(x, y, 2) = colour.b;
-#endif // ALIASING_A4
+			colour = colour + shadeRay(r, 0, RAY_DISTANCE_MAX, surfaces, ambient, lights, 0);
 		}
-	}
 
+		float scale = 1.0 / SAMPLES_PER_PIXEL;
+		colour = colour*scale;
+
+		image(x, y, 0) = colour.r;
+		image(x, y, 1) = colour.g;
+		image(x, y, 2) = colour.b;
+
+#endif // ALIASING_A4
+	}
 }

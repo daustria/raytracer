@@ -4,7 +4,7 @@
 #include <iostream>
 #include <list>
 #include <string>
-#include "PhongMaterial.hpp"
+#include "Material.hpp"
 #include "Ray.hpp"
 
 class Primitive; 
@@ -13,7 +13,7 @@ struct SurfaceParams
 {
 	glm::mat4 trans;
 	glm::mat4 inv_trans;
-	PhongMaterial *material;
+	Material *material;
 	std::string name;
 };
 

@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include "Material.hpp"
+#include "Ray.hpp"
 
 class PhongMaterial : public Material 
 {
