@@ -10,6 +10,7 @@ Implemented features include:
 - Secondary ray reflections
 - Phong shading
 - Importing object files with triangle mesh and vertex coordinates (I make meshes in Blender and export an object file)
+- Textures
 - Anti-aliasing
 - Shadows
 
