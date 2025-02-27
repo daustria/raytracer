@@ -7,7 +7,7 @@ Peter Shirley et al.
 
 Implemented features include:
 
-- Secondary ray reflections
+- Recursive ray reflections
 - Phong shading
 - Loading .obj files, particularly from Blender
 - Textures
